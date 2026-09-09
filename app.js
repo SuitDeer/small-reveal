@@ -2,7 +2,7 @@
 (async () => {
   'use strict';
 
-  const APP_VERSION = '1.2.0'; // semver — single source of truth for the About modal
+  const APP_VERSION = '1.2.1'; // semver — single source of truth for the About modal
   const REVEAL_VERSION = '5.1.0';
   const LIBRARY_KEY = 'reveal-editor:library:v1';
   const LEGACY_STORAGE_KEY = 'reveal-editor:project:v1';
@@ -646,27 +646,41 @@
         e.dataTransfer.setData('text/x-slide-id', slide.id);
         e.dataTransfer.effectAllowed = 'move';
       });
-      // Dropping on the upper half of a slide inserts before it; the lower
-      // half inserts after. Without the "after" case the last position in
-      // the deck is unreachable by drag-and-drop.
-      const dropAfter = (e) => {
+      // Three drop zones per row, the usual tree-view convention: the top and
+      // bottom thirds insert before/after as a sibling, and the middle third
+      // drops *into* the target, making the dragged slide a vertical
+      // sub-slide of it. Without the "after" case the last position in the
+      // deck would be unreachable by drag-and-drop.
+      const dropMode = (e) => {
         const rect = li.getBoundingClientRect();
-        return e.clientY > rect.top + rect.height / 2;
+        const y = (e.clientY - rect.top) / (rect.height || 1);
+        if (y < 0.3) return 'before';
+        if (y > 0.7) return 'after';
+        return 'nest';
       };
+      const clearDropCues = () =>
+        li.classList.remove('drag-over', 'drag-over-after', 'drag-over-nest');
       li.addEventListener('dragover', (e) => {
         if (e.dataTransfer.types.includes('text/x-slide-id')) {
           e.preventDefault();
-          const after = dropAfter(e);
-          li.classList.toggle('drag-over', !after);
-          li.classList.toggle('drag-over-after', after);
+          const mode = dropMode(e);
+          li.classList.toggle('drag-over', mode === 'before');
+          li.classList.toggle('drag-over-after', mode === 'after');
+          li.classList.toggle('drag-over-nest', mode === 'nest');
         }
       });
-      li.addEventListener('dragleave', () => li.classList.remove('drag-over', 'drag-over-after'));
+      li.addEventListener('dragleave', clearDropCues);
+      // Fires on the source row even if the drop lands outside the list, so
+      // no row is left wearing a stale highlight.
+      li.addEventListener('dragend', () => {
+        els.slideList.querySelectorAll('li').forEach(el =>
+          el.classList.remove('drag-over', 'drag-over-after', 'drag-over-nest'));
+      });
       li.addEventListener('drop', (e) => {
         e.preventDefault();
-        li.classList.remove('drag-over', 'drag-over-after');
+        clearDropCues();
         const fromId = e.dataTransfer.getData('text/x-slide-id');
-        if (fromId && fromId !== slide.id) moveSlide(fromId, slide.id, dropAfter(e));
+        if (fromId && fromId !== slide.id) moveSlide(fromId, slide.id, dropMode(e));
       });
 
       li.addEventListener('contextmenu', (e) => {
@@ -1214,15 +1228,57 @@
     scheduleSave();
   }
 
-  function moveSlide(fromId, targetId, after = false) {
+  // How many slides move together when you drag the one at `idx`. A top-level
+  // slide carries its vertical children with it; a child moves on its own.
+  // Slot 0 is always top-level, so a stray vertical flag there is ignored.
+  function slideBlockLength(idx) {
+    const s = state.slides[idx];
+    if (!s) return 0;
+    if (idx > 0 && s.vertical) return 1;
+    let n = 1;
+    while (idx + n < state.slides.length && state.slides[idx + n].vertical) n++;
+    return n;
+  }
+
+  // mode: 'before' | 'after' | 'nest'
+  //   before/after place the block as a sibling at the target's own level.
+  //   nest makes the block a vertical sub-slide directly under the target
+  //   (or, when the target is itself a sub-slide, joins its group there).
+  function moveSlide(fromId, targetId, mode = 'before') {
     const fromIdx = state.slides.findIndex(s => s.id === fromId);
-    if (fromIdx < 0) return;
+    const targetIdx = state.slides.findIndex(s => s.id === targetId);
+    if (fromIdx < 0 || targetIdx < 0) return;
+
+    const len = slideBlockLength(fromIdx);
+    // Dropping a block inside itself would delete it — a parent can't become
+    // a child of its own descendant.
+    if (targetIdx >= fromIdx && targetIdx < fromIdx + len) return;
+
+    const target = state.slides[targetIdx];
+    let insertAt;
+    let vertical;
+    if (mode === 'nest') {
+      insertAt = targetIdx + 1;
+      vertical = true;
+    } else if (mode === 'after') {
+      // Land past the target's whole group so we never split one open.
+      insertAt = targetIdx + slideBlockLength(targetIdx);
+      vertical = !!target.vertical && targetIdx > 0;
+    } else {
+      insertAt = targetIdx;
+      vertical = !!target.vertical && targetIdx > 0;
+    }
+
     recordHistory();
-    const [moved] = state.slides.splice(fromIdx, 1);
-    let toIdx = state.slides.findIndex(s => s.id === targetId);
-    if (toIdx < 0) toIdx = state.slides.length;
-    else if (after) toIdx += 1;
-    state.slides.splice(toIdx, 0, moved);
+    const block = state.slides.splice(fromIdx, len);
+    if (fromIdx < insertAt) insertAt -= len;
+    block[0].vertical = vertical;
+    state.slides.splice(insertAt, 0, ...block);
+    // Slot 0 can never be a sub-slide.
+    if (state.slides[0]) state.slides[0].vertical = false;
+
+    const cur = currentSlide();
+    if (cur) els.vertical.checked = !!cur.vertical;
     renderSidebar();
     scheduleSave();
   }

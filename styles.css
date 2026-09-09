@@ -175,6 +175,22 @@ body.notes-open .layout {
 .slide-list li.drag-over-after {
   border-bottom: 2px solid var(--accent);
 }
+/* Drop-into cue: the target row is outlined as the parent-to-be, and an
+   indented bar under it shows where the new sub-slide will land. */
+.slide-list li.drag-over-nest {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 1px var(--accent) inset;
+}
+.slide-list li.drag-over-nest::after {
+  content: "";
+  position: absolute;
+  left: 18px;
+  right: 0;
+  bottom: -5px;
+  height: 2px;
+  border-radius: 1px;
+  background: var(--accent);
+}
 .slide-list li.vertical {
   margin-left: 18px;
 }
