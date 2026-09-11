@@ -1,9 +1,13 @@
-// Reveal Editor — a small browser GUI for building reveal.js decks.
+// Small Reveal — a small browser GUI for building reveal.js decks.
 (async () => {
   'use strict';
 
-  const APP_VERSION = '1.3.0'; // semver — single source of truth for the About modal
+  const APP_VERSION = '1.4.0'; // semver — single source of truth for the About modal
   const REVEAL_VERSION = '5.1.0';
+  // The app was called "Reveal Editor" before it was Small Reveal. Every
+  // storage key below still carries the old name ON PURPOSE — they address
+  // data already sitting in people's browsers, and renaming them would look
+  // exactly like total data loss. They are never shown to anyone.
   const LIBRARY_KEY = 'reveal-editor:library:v1';
   const LEGACY_STORAGE_KEY = 'reveal-editor:project:v1';
   const THEME_KEY = 'reveal-editor:ui-theme';
@@ -409,6 +413,7 @@
   let sourceMode = false;
   let saveTimer = null;
 
+  // Pre-rename name, kept so existing decks stay reachable. See LIBRARY_KEY.
   const DB_NAME = 'reveal-editor';
   const DB_VERSION = 1;
   const STORE_META = 'meta';
@@ -2481,6 +2486,7 @@ ${sections}
   }
 
   // -------- PDF export (via reveal's built-in print-pdf mode) --------
+  // Pre-rename name, and must stay identical to preview.js's copy.
   const PDF_PAYLOAD_KEY = 'reveal-editor:pdf-payload';
 
   function exportProjectAsPdf(id) {
@@ -2872,7 +2878,7 @@ ${sections}
     }
     const blob = await zip.generateAsync({ type: 'blob' });
     const stamp = new Date().toISOString().slice(0, 10);
-    download(blob, `reveal-editor-projects-${stamp}.zip`, 'application/zip');
+    download(blob, `small-reveal-projects-${stamp}.zip`, 'application/zip');
   }
 
   async function importFiles(fileList) {
@@ -3784,6 +3790,9 @@ ${sections}
   }
 
   // -------- Sync via GitHub Gist --------
+  // Pre-rename names, kept so a browser that is already connected to a gist
+  // stays connected. Renaming these would silently sign people out. See
+  // LIBRARY_KEY.
   const SYNC_STORAGE = {
     pat: 'reveal-editor:sync:pat',
     gistId: 'reveal-editor:sync:gist',
@@ -4288,7 +4297,7 @@ ${sections}
       if (!sync.gistId) {
         const created = await gistCreate(
           { [SYNC_LIBRARY_FILE]: buildLibraryGistFile(), ...buildProjectGistFiles() },
-          'Reveal Editor projects (sync)',
+          'Small Reveal projects (sync)',
         );
         sync.gistId = created.id;
         pushDirty.clear();   // everything was just uploaded

@@ -1,6 +1,7 @@
 (function () {
   'use strict';
 
+  // Pre-rename name, and must stay identical to app.js's copy.
   var PDF_PAYLOAD_KEY = 'reveal-editor:pdf-payload';
 
   function setHref(id, href) { document.getElementById(id).href = href; }

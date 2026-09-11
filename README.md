@@ -1,10 +1,10 @@
-# Reveal Editor
+# Small Reveal
 
-A browser-based WYSIWYG editor for [reveal.js](https://revealjs.com) presentations. There's no build or backend. Reveal Editor easily installs on Reclaim Hosting or any other shared hosting service. Everything runs client-side in the browser, and decks live in your own browser's storage. 
+A browser-based WYSIWYG editor for [reveal.js](https://revealjs.com) presentations. There's no build or backend. Small Reveal easily installs on Reclaim Hosting or any other shared hosting service. Everything runs client-side in the browser, and decks live in your own browser's storage. 
 
 **Live demo:** `https://slides.samplereality.com`
 
-![Screenshot of the editor](reveal-editor.jpg)
+![Screenshot of the editor](small-reveal.jpg)
 
 ## What it does
 

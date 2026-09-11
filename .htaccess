@@ -1,4 +1,4 @@
-# reveal-editor — Apache config for shared hosting
+# small-reveal — Apache config for shared hosting
 # Drop this in the directory you upload index.html / app.js / styles.css to.
 
 # ----- HTTPS -----
