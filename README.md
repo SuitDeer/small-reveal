@@ -1,6 +1,6 @@
 # Small Reveal
 
-A browser-based WYSIWYG editor for [reveal.js](https://revealjs.com) presentations. There's no build or backend. Small Reveal easily installs on Reclaim Hosting or any other shared hosting service. Everything runs client-side in the browser, and decks live in your own browser's storage. 
+A browser-based WYSIWYG editor for [reveal.js](https://revealjs.com) presentations with no build or backend. Small Reveal easily installs on Reclaim Hosting or any other shared hosting service. Everything runs client-side in the browser, and decks live in your own browser's storage. 
 
 **Live demo:** `https://slides.samplereality.com`
 
@@ -29,7 +29,7 @@ Side effects worth knowing:
 
 - Different browser or device = different IDB. Projects don't follow you unless you set up [sync](#syncing-across-browsers).
 - Clearing site data in your browser deletes everything. Export a backup if it matters.
-- Two tabs editing the same project = last write wins. Avoid it.
+- If two tabs edit the same project, the last write wins. Avoid this.
 
 ## Syncing across browsers
 
@@ -69,7 +69,7 @@ Stale tombstoned files are also cleaned off the gist automatically on this brows
 
 ## Hosting it yourself
 
-It's a folder of static files. Drop it on any HTTPS host.
+It's a folder of static files. Just drop it on any HTTPS host.
 
 ### GitHub Pages
 
@@ -118,7 +118,7 @@ Practical upshot: **only import project files from sources you trust.** Importin
 - [turndown 7.2.0](https://github.com/mixmark-io/turndown) and [marked 13.0.3](https://marked.js.org/) — HTML↔Markdown conversion for the `.md` import/export, both pinned via SRI.
 - [Bootstrap Icons 1.11.3](https://icons.getbootstrap.com/) — toolbar and topbar icons, loaded from jsdelivr and pinned via SRI.
 
-The editor is five small files: `index.html`, `app.js`, `styles.css` for the editor itself, plus `preview.html` + `preview.js` for the sandboxed preview page. About 1,500 lines of JS for everything you see.
+The editor is five small files: `index.html`, `app.js`, `styles.css` for the editor itself, plus `preview.html` + `preview.js` for the sandboxed preview page.
 
 ## License
 
