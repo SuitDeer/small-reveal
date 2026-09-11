@@ -71,6 +71,8 @@ Stale tombstoned files are also cleaned off the gist automatically on this brows
 
 It's a folder of static files. Just drop it on any HTTPS host.
 
+Link previews (Bluesky, Mastodon, Slack, iMessage, search engines) come from the Open Graph tags in `index.html`. Those URLs are **absolute**, because most scrapers won't resolve a relative `og:image`. If you host this on your own domain, change `slides.samplereality.com` to your domain in the five places the comment above those tags points at, or your links will preview someone else's site. The card itself is `og-image.png`; `og-image.html` is its source and explains how to re-render it.
+
 ### GitHub Pages
 
 This repo is set up for it. Pages serves from the root of `main`; a `CNAME` file at the root pins the custom domain.
