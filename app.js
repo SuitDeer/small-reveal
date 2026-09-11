@@ -2,7 +2,7 @@
 (async () => {
   'use strict';
 
-  const APP_VERSION = '1.4.0'; // semver — single source of truth for the About modal
+  const APP_VERSION = '1.4.1'; // semver — single source of truth for the About modal
   const REVEAL_VERSION = '5.1.0';
   // The app was called "Reveal Editor" before it was Small Reveal. Every
   // storage key below still carries the old name ON PURPOSE — they address
