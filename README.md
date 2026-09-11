@@ -108,9 +108,17 @@ python3 -m http.server 8000
 Slide content is arbitrary HTML — including `<script>` and `<iframe>` because that's what reveal supports.
 
 - **Preview iframe.** The preview iframe carries no `sandbox` attribute. I tried — `allow-scripts allow-same-origin` got close, but Chrome's built-in PDF viewer refuses to render inside any sandboxed iframe on production (works on `localhost`, fails on real domains), and PDF iframe backgrounds are a feature I wanted. Slide scripts in the preview therefore run at the editor's full origin: a `<script>` in an imported deck can reach `window.parent`, read your IndexedDB, navigate the top window, etc. On a same-origin host the sandbox wouldn't have added meaningful protection here anyway.
-- **Two-CSP design.** The editor itself runs under a strict CSP (its own origin, jsdelivr, Google Fonts; no inline scripts). The preview lives in a separate `preview.html` page that's loaded into the iframe and gets the deck data via `postMessage` — so its more permissive CSP (needed for arbitrary slide HTML) is isolated from the editor's at the CSP level. The same CSP is enforced via `.htaccess` on Apache hosts and a `<meta>` tag on static hosts. JSZip is pinned with a subresource-integrity hash.
+- **Two-CSP design.** The editor itself runs under a strict CSP (its own origin, jsdelivr, Google Fonts, and `gc.zgo.at` for the analytics script; no inline scripts). The preview lives in a separate `preview.html` page that's loaded into the iframe and gets the deck data via `postMessage` — so its more permissive CSP (needed for arbitrary slide HTML) is isolated from the editor's at the CSP level. The same CSP is enforced via `.htaccess` on Apache hosts and a `<meta>` tag on static hosts. Every third-party script — JSZip, turndown, marked, and GoatCounter's `count.js` — is pinned with a subresource-integrity hash, so a compromised CDN cannot run code at the editor's origin.
 
 Practical upshot: **only import project files from sources you trust.** Importing a deck is now inert — files are parsed with `DOMParser`, so nothing in them executes at import time — but scripts and `<img onerror="...">` handlers in an imported deck still run when you open it in the editor or preview it. Because the preview iframe runs at the editor's origin, that script can read your entire project library, **including the GitHub token in `localStorage` if you've set up gist sync**, and navigate the editor anywhere. If that's a concern for you, host `preview.html` on a separate subdomain — then it's a genuinely different origin and slide scripts can't reach the editor.
+
+## Analytics
+
+The hosted copy at `slides.samplereality.com` counts page views with [GoatCounter](https://www.goatcounter.com/). No cookies, no personal data, no cross-site tracking, and nothing about your decks — those never leave your browser. GoatCounter's script skips `localhost` and private IP ranges on its own, so running it locally never reports anything.
+
+If you self-host, edit the `<script data-goatcounter=...>` tag near the bottom of `index.html`: change `slides` to your own GoatCounter code, or delete the tag entirely. Leaving it reports your visitors to someone else's account. Deleting it also lets you drop `https://gc.zgo.at` from `script-src` and `https://slides.goatcounter.com` from `connect-src` in both `index.html` and `.htaccess`.
+
+The script is pinned with a subresource-integrity hash. If GoatCounter ever ships a new `count.js`, the hash stops matching and the script silently stops loading — analytics go quiet, nothing else breaks. The comment above the tag has the one-liner to regenerate it.
 
 ## Tech stack
 
@@ -119,6 +127,7 @@ Practical upshot: **only import project files from sources you trust.** Importin
 - [JSZip 3.10.1](https://stuk.github.io/jszip/) — for the `.zip` import/export, pinned via SRI.
 - [turndown 7.2.0](https://github.com/mixmark-io/turndown) and [marked 13.0.3](https://marked.js.org/) — HTML↔Markdown conversion for the `.md` import/export, both pinned via SRI.
 - [Bootstrap Icons 1.11.3](https://icons.getbootstrap.com/) — toolbar and topbar icons, loaded from jsdelivr and pinned via SRI.
+- [GoatCounter](https://www.goatcounter.com/) — cookieless page-view counting on the hosted copy, pinned via SRI. See [Analytics](#analytics).
 
 The editor is five small files: `index.html`, `app.js`, `styles.css` for the editor itself, plus `preview.html` + `preview.js` for the sandboxed preview page.
 

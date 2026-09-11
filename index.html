@@ -5,7 +5,7 @@
 <!-- CSP must be the first non-charset element in <head> so it applies to all
      subsequent resource loads. Mirrors what .htaccess sends on Apache hosts;
      this meta tag is what enforces it on static hosts like GitHub Pages. -->
-<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' https://cdn.jsdelivr.net; style-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net https://fonts.googleapis.com; img-src 'self' data: https:; media-src 'self' data: https:; font-src 'self' data: https://cdn.jsdelivr.net https://fonts.gstatic.com; frame-src 'self' https:; connect-src 'self' https://cdn.jsdelivr.net https://api.github.com https://gist.githubusercontent.com; base-uri 'self'; form-action 'self'; object-src 'none'">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' https://cdn.jsdelivr.net https://gc.zgo.at; style-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net https://fonts.googleapis.com; img-src 'self' data: https:; media-src 'self' data: https:; font-src 'self' data: https://cdn.jsdelivr.net https://fonts.gstatic.com; frame-src 'self' https:; connect-src 'self' https://cdn.jsdelivr.net https://api.github.com https://gist.githubusercontent.com https://slides.goatcounter.com; base-uri 'self'; form-action 'self'; object-src 'none'">
 <meta name="referrer" content="no-referrer">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Small Reveal</title>
@@ -447,6 +447,18 @@
 <script src="https://cdn.jsdelivr.net/npm/marked@13.0.3/marked.min.js"
         integrity="sha384-YTBHtsL8yVTHcLakYNyrOfK3K+QQcXiECuaALJ+3j7Mo681Rtzadt8NR6WrZH+eQ"
         crossorigin="anonymous"></script>
+<!-- GoatCounter: cookieless, no personal data, and it skips localhost and
+     private IPs on its own, so development traffic is never counted. The
+     "slides" in the endpoint is this deploy's account — if you self-host,
+     change it to your own code or delete this tag, otherwise your visits are
+     reported to someone else. Pinned with SRI like everything else here; if
+     GoatCounter ships a new count.js the script will stop loading and the
+     hash needs regenerating with:
+       curl -s https://gc.zgo.at/count.js | openssl dgst -sha384 -binary | openssl base64 -A -->
+<script data-goatcounter="https://slides.goatcounter.com/count"
+        src="https://gc.zgo.at/count.js"
+        integrity="sha384-2UjvVpptg4JlEVgJI2PdscrjOjPcil/4F1ZvIMJ81CShQnEDSlPI+l4PfogvTLYi"
+        crossorigin="anonymous" async></script>
 <script src="app.js"></script>
 </body>
 </html>
