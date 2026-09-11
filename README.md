@@ -17,7 +17,8 @@ A browser-based WYSIWYG editor for [reveal.js](https://revealjs.com) presentatio
 - **Speaker notes side panel.** Opens to the right of the slide so you can see the slide and notes at the same time. Notes also appear in the deck's reveal speaker view (press `S` during a preview).
 - **Reveal.js settings, per deck.** Control [reveal.js config options](https://revealjs.com/config/). Settings are stored on the project, travel with `.json` export/import, and apply to the live preview, the standalone HTML export, and the PDF export.
 - **Multiple projects** with a Projects modal — open, duplicate, rename, delete, or export any of them.
-- **Import/Export.** Import from `.json` or `.md`. Export formats include `.json`, `.html`, `.md`, and `.pdf`.
+- **Markdown editor.** The **Markdown** button in the topbar swaps the slide canvas for the whole deck as one markdown file, the way reveal's own markdown decks are written. Edit wording, reorder, or add slides by typing `---`, then press **Apply to deck**. It is deliberately not live two-way: your text is yours until you apply, and one undo (`Cmd/Ctrl + Z`) puts the deck back. Element classes travel as reveal's `<!-- .element: class="..." -->` comments, so fragments, `r-fit-text`, and `r-stretch` survive the round trip. Pasted images show up as short `asset:1` tokens instead of pages of base64, and are restored when you apply.
+- **Import/Export.** Import from `.json` or `.md`. Export formats include `.json`, `.html`, `.md`, and `.pdf`. Markdown round-trips without loss: element classes become `.element` comments, plain grids become pipe tables, and anything markdown cannot express (layout `div`s, inline styles, tables with spans) stays as literal HTML.
 /- **Image optimization on paste/drop.** Large photos get resized to 1920 px on the longest side and re-encoded as JPEG (quality 0.85) before storage. Small icons and SVGs are left untouched.
 
 ## How it stores your work
@@ -89,7 +90,7 @@ python3 -m http.server 8000
 
 | | |
 | --- | --- |
-| `Cmd/Ctrl + S` | flush save |
+| `Cmd/Ctrl + S` | flush save (in the markdown editor, applies first) |
 | `Cmd/Ctrl + Shift + Enter` | new slide after current |
 | `Cmd/Ctrl + P` | preview from start (press again to close) |
 | `Cmd/Ctrl + Shift + P` | preview from current slide |

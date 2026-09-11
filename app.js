@@ -2,7 +2,7 @@
 (async () => {
   'use strict';
 
-  const APP_VERSION = '1.2.1'; // semver — single source of truth for the About modal
+  const APP_VERSION = '1.3.0'; // semver — single source of truth for the About modal
   const REVEAL_VERSION = '5.1.0';
   const LIBRARY_KEY = 'reveal-editor:library:v1';
   const LEGACY_STORAGE_KEY = 'reveal-editor:project:v1';
@@ -62,6 +62,12 @@
     dropOverlay: $('#drop-overlay'),
     slideMenu: $('#slide-context-menu'),
     toolbarMenu: $('#toolbar-menu'),
+    markdownBtn: $('#btn-markdown'),
+    markdownPane: $('#markdown-pane'),
+    markdownText: $('#markdown-text'),
+    markdownApply: $('#markdown-apply'),
+    markdownRevert: $('#markdown-revert'),
+    markdownStatus: $('#markdown-status'),
     blockStyle: $('#block-style'),
     fragmentMenuBtn: $('#btn-fragment-menu'),
     moreBtn: $('#btn-more'),
@@ -314,6 +320,23 @@
     };
   }
 
+  // applySlideEffects sizes .r-fit-text and .r-stretch with inline styles so
+  // the editor preview matches the slide. Those numbers are measured against
+  // the editor pane, not the deck, and reveal.js computes its own at runtime —
+  // an inline value would override it. Strip them before anything stores or
+  // exports the content.
+  function stripEditorSizing(root) {
+    root.querySelectorAll('.r-fit-text').forEach(el => {
+      el.style.fontSize = '';
+      if (!el.getAttribute('style')) el.removeAttribute('style');
+    });
+    root.querySelectorAll('.r-stretch').forEach(el => {
+      el.style.height = '';
+      if (!el.getAttribute('style')) el.removeAttribute('style');
+    });
+    return root;
+  }
+
   function migrateSlide(s) {
     if (!s || typeof s !== 'object') return s;
     if (s.background === undefined) {
@@ -333,6 +356,13 @@
       s.background.size = '';
     }
     if (typeof s.vertical !== 'boolean') s.vertical = false;
+    // Older decks were saved with the editor's measured sizing baked in.
+    if (typeof s.content === 'string' && /r-fit-text|r-stretch/.test(s.content)) {
+      const holder = document.createElement('div');
+      holder.innerHTML = s.content;
+      const cleaned = stripEditorSizing(holder).innerHTML;
+      if (cleaned !== s.content) s.content = cleaned;
+    }
     return s;
   }
 
@@ -1311,6 +1341,7 @@
     clone.querySelectorAll('[data-fragment-label]').forEach(el => {
       el.removeAttribute('data-fragment-label');
     });
+    stripEditorSizing(clone);
     return clone.innerHTML;
   }
 
@@ -1579,6 +1610,129 @@
   // Keeps the dropdown's selected option in sync with the fragment under the
   // cursor. If no fragment is active, the dropdown reverts to the user's last
   // manually chosen default (stored on the element).
+  // -------- Deck markdown mode --------
+  // Edits the whole deck as one markdown file, the way reveal's own markdown
+  // decks are authored. Deliberately NOT live two-way: re-parsing on every
+  // keystroke would churn slide identity and fight the cursor, so the buffer
+  // is yours until you press Apply.
+  let markdownMode = false;
+  let markdownBaseline = '';      // what we generated on open, for dirty checks
+  let markdownAssets = new Map(); // asset:N  ->  original data: URI
+
+  // Pasted images live in the deck as data URIs. Inlining a few hundred
+  // kilobytes of base64 would make the buffer unusable, so each distinct URI
+  // is swapped for a short token that still reads as a URL inside ![](...).
+  const DATA_URI_RE = /data:[a-z0-9.+-]+\/[a-z0-9.+-]+;base64,[A-Za-z0-9+/=]+/gi;
+
+  function stashDataUris(text) {
+    const byUri = new Map();
+    const map = new Map();
+    let n = 0;
+    const out = text.replace(DATA_URI_RE, (uri) => {
+      let token = byUri.get(uri);
+      if (!token) {
+        token = `asset:${++n}`;
+        byUri.set(uri, token);
+        map.set(token, uri);
+      }
+      return token;
+    });
+    return { text: out, map };
+  }
+
+  function restoreDataUris(text, map) {
+    let out = text;
+    map.forEach((uri, token) => { out = out.split(token).join(uri); });
+    return out;
+  }
+
+  function deckToMarkdownText() {
+    captureCurrentContent();
+    const md = projectToMarkdown(snapshotProject());
+    const { text, map } = stashDataUris(md);
+    markdownAssets = map;
+    return text;
+  }
+
+  function openMarkdownMode() {
+    if (markdownMode) return;
+    if (typeof TurndownService === 'undefined' || typeof marked === 'undefined') {
+      setStatus('Markdown converter failed to load — check your network.', false);
+      return;
+    }
+    if (sourceMode) els.toggleSource.click();   // per-slide HTML view is a different scope
+    closeToolbarMenu(false);
+    markdownMode = true;
+    document.body.classList.add('markdown-mode');
+    els.markdownPane.hidden = false;
+    els.markdownBtn.setAttribute('aria-pressed', 'true');
+    els.markdownBtn.classList.add('active');
+    const text = deckToMarkdownText();
+    els.markdownText.value = text;
+    markdownBaseline = text;
+    setMarkdownStatus('');
+    els.markdownText.focus();
+    els.markdownText.setSelectionRange(0, 0);
+  }
+
+  function closeMarkdownMode({ force = false } = {}) {
+    if (!markdownMode) return true;
+    if (!force && els.markdownText.value !== markdownBaseline
+        && !confirm('Discard your unapplied markdown changes?')) {
+      return false;
+    }
+    markdownMode = false;
+    document.body.classList.remove('markdown-mode');
+    els.markdownPane.hidden = true;
+    els.markdownBtn.setAttribute('aria-pressed', 'false');
+    els.markdownBtn.classList.remove('active');
+    markdownAssets = new Map();
+    renderEditor();
+    return true;
+  }
+
+  function setMarkdownStatus(msg, ok = true) {
+    els.markdownStatus.textContent = msg;
+    els.markdownStatus.classList.toggle('bad', !ok);
+  }
+
+  function applyMarkdownToDeck() {
+    const raw = restoreDataUris(els.markdownText.value, markdownAssets);
+    let slides;
+    try {
+      slides = parseMarkdownDeck(raw);
+    } catch (err) {
+      setMarkdownStatus('Could not parse: ' + (err && err.message || err), false);
+      return false;
+    }
+    if (!slides.length) {
+      setMarkdownStatus('Nothing to apply — the markdown is empty.', false);
+      return false;
+    }
+    recordHistory();
+    // Reuse the existing slide ids position by position so the sidebar
+    // selection, and anything else keyed on id, survives an edit that only
+    // changed wording.
+    const oldIds = state.slides.map(s => s.id);
+    slides.forEach((s, i) => { if (oldIds[i]) s.id = oldIds[i]; });
+    const before = state.slides.length;
+    state.slides = slides;
+    if (!slides.some(s => s.id === state.currentId)) state.currentId = slides[0].id;
+    renderAll();
+    scheduleSave();
+    const delta = slides.length - before;
+    setMarkdownStatus(
+      `Applied — ${slides.length} slide${slides.length === 1 ? '' : 's'}`
+      + (delta ? ` (${delta > 0 ? '+' : ''}${delta})` : ''));
+    // Regenerate so the buffer reflects exactly what the deck now holds.
+    const text = deckToMarkdownText();
+    const pos = els.markdownText.selectionStart;
+    els.markdownText.value = text;
+    markdownBaseline = text;
+    try { els.markdownText.setSelectionRange(pos, pos); } catch {}
+    return true;
+  }
+
   // -------- Toolbar popover menus --------
   // The rarely-used tools live behind the "More" button and the fragment
   // animation behind a caret, so the always-visible row stays short enough
@@ -2355,7 +2509,58 @@ ${sections}
     }
   }
 
-  function projectToMarkdown(p) {
+  // -------- HTML <-> Markdown, losslessly --------
+  // Plain turndown throws away anything markdown cannot express: the class on
+  // a fragment, r-fit-text, r-stretch, whole tables, inline styles. That is
+  // survivable for a one-way import but not for editing a deck through
+  // markdown and writing it back. Two mechanisms close the gap:
+  //
+  //   1. Blocks carrying classes get reveal's own `<!-- .element: -->`
+  //      comment, which is the syntax reveal's markdown plugin already uses.
+  //   2. Anything with no markdown equivalent at all (tables, layout divs,
+  //      inline styles, classed spans) is emitted as literal HTML, which
+  //      markdown permits and both converters pass through untouched.
+  const MD_MARK_OPEN = '\u2999EL:';
+  const MD_MARK_CLOSE = '\u299A';
+  const MD_MARK_RE = /\u2999EL:([^\u299A]*)\u299A/g;
+  const MD_BLOCK_MARKABLE = new Set([
+    'H1', 'H2', 'H3', 'H4', 'H5', 'H6', 'P', 'LI', 'UL', 'OL',
+    'BLOCKQUOTE', 'PRE', 'IMG', 'FIGURE',
+  ]);
+  const MD_KEEP_TAGS = new Set(['IFRAME', 'VIDEO', 'AUDIO', 'DIV', 'FORM', 'SVG', 'CANVAS']);
+  const MD_INLINE_CARRIERS = new Set(['SPAN', 'A', 'SUP', 'SUB', 'MARK', 'CODE', 'EM', 'STRONG']);
+  const MD_VOIDISH = new Set(['IMG', 'HR', 'BR']);
+
+  // A table can be written as a pipe table only when it is a plain grid:
+  // one header row, no spans, no block content or styling in the cells.
+  // Anything else keeps its HTML, which is lossless if less pretty.
+  function mdIsSimpleTable(t) {
+    if (t.querySelector('table')) return false;
+    const rows = Array.from(t.rows || []);
+    if (rows.length < 1) return false;
+    const grid = rows.map(r => Array.from(r.cells));
+    const width = grid[0].length;
+    if (!width || grid.some(r => r.length !== width)) return false;
+    if (!grid[0].every(c => c.nodeName === 'TH')) return false;
+    if (grid.slice(1).some(r => r.some(c => c.nodeName === 'TH'))) return false;
+    const cells = Array.from(t.querySelectorAll('th, td'));
+    if (cells.some(c => c.colSpan > 1 || c.rowSpan > 1)) return false;
+    if (cells.some(c => c.getAttribute('style') || c.getAttribute('class'))) return false;
+    if (t.getAttribute('style') || t.getAttribute('class')) return false;
+    if (t.querySelector('th p, td p, th div, td div, th ul, td ul, th ol, td ol, th pre, td pre, th table, td table')) return false;
+    return true;
+  }
+
+  function mdKeepRaw(node) {
+    if (!node || node.nodeType !== 1) return false;
+    if (node.nodeName === 'TABLE') return !mdIsSimpleTable(node);
+    if (MD_KEEP_TAGS.has(node.nodeName)) return true;
+    if (node.getAttribute('style')) return true;
+    if (MD_INLINE_CARRIERS.has(node.nodeName) && node.getAttribute('class')) return true;
+    return false;
+  }
+
+  function makeMarkdownTurndown() {
     const td = new TurndownService({
       headingStyle: 'atx',
       codeBlockStyle: 'fenced',
@@ -2365,8 +2570,121 @@ ${sections}
       hr: '***',
       emDelimiter: '*',
     });
-    td.keep(['iframe', 'video', 'audio']);
+    // addRule rather than keep(): turndown consults its built-in rules before
+    // keep filters, so keep() alone never fires for <a>, <img> or a styled
+    // <p> — the very cases we need to preserve.
+    td.addRule('revealKeepRaw', {
+      filter: mdKeepRaw,
+      // Inline carriers must stay inside their paragraph; padding them with
+      // blank lines would split a sentence into separate blocks.
+      replacement: (content, node) => MD_INLINE_CARRIERS.has(node.nodeName)
+        ? node.outerHTML
+        : '\n\n' + node.outerHTML + '\n\n',
+    });
 
+    // Turndown ships no table rule, so a table typed as markdown would come
+    // back as HTML on the next round trip. Emit a pipe table for plain grids.
+    const inlineTd = new TurndownService({ emDelimiter: '*', bulletListMarker: '-' });
+    inlineTd.addRule('revealKeepRawInline', {
+      filter: mdKeepRaw,
+      replacement: (content, node) => node.outerHTML,
+    });
+    const cellText = (cell) => inlineTd.turndown(cell.innerHTML || '')
+      .replace(/\s*\n\s*/g, ' ')
+      .replace(/\|/g, '\\|')
+      .trim();
+    const ALIGN_BAR = { left: ':---', right: '---:', center: ':---:' };
+    td.addRule('revealTable', {
+      filter: (node) => node.nodeName === 'TABLE' && mdIsSimpleTable(node),
+      replacement: (content, node) => {
+        const rows = Array.from(node.rows);
+        const head = Array.from(rows[0].cells);
+        const lines = [
+          '| ' + head.map(cellText).join(' | ') + ' |',
+          '| ' + head.map(c => ALIGN_BAR[(c.getAttribute('align') || '').toLowerCase()] || '---').join(' | ') + ' |',
+        ];
+        rows.slice(1).forEach(r => {
+          lines.push('| ' + Array.from(r.cells).map(cellText).join(' | ') + ' |');
+        });
+        return '\n\n' + lines.join('\n') + '\n\n';
+      },
+    });
+    return td;
+  }
+
+  function mdKeptRawAncestor(el, root) {
+    for (let n = el.parentNode; n && n !== root; n = n.parentNode) {
+      if (mdKeepRaw(n)) return true;
+    }
+    return false;
+  }
+
+  // Stamp a marker into a detached copy of the slide so each class survives
+  // turndown and can be re-emitted as an .element comment afterwards.
+  function mdStampClasses(root) {
+    Array.from(root.querySelectorAll('*')).forEach(el => {
+      const cls = el.getAttribute('class');
+      if (!cls || !MD_BLOCK_MARKABLE.has(el.nodeName)) return;
+      if (mdKeepRaw(el) || mdKeptRawAncestor(el, root)) return;
+      const marker = document.createTextNode(' ' + MD_MARK_OPEN + cls + MD_MARK_CLOSE);
+      if (MD_VOIDISH.has(el.nodeName)) el.parentNode.insertBefore(marker, el.nextSibling);
+      else el.appendChild(marker);
+      el.removeAttribute('class');
+    });
+  }
+
+  function htmlToMarkdown(html, td) {
+    const holder = document.createElement('div');
+    holder.innerHTML = html || '';
+    mdStampClasses(holder);
+    return td.turndown(holder.innerHTML)
+      .replace(MD_MARK_RE, (_, cls) => `<!-- .element: class="${cls}" -->`);
+  }
+
+  // Parse markdown and fold any `<!-- .element: -->` comments back onto the
+  // block they describe.
+  function markdownToHtml(md) {
+    const holder = document.createElement('div');
+    holder.innerHTML = marked.parse(md || '');
+    const walker = document.createTreeWalker(holder, NodeFilter.SHOW_COMMENT);
+    const comments = [];
+    while (walker.nextNode()) comments.push(walker.currentNode);
+    comments.forEach(c => {
+      const m = c.nodeValue.match(/^\s*\.element:\s*([^]*?)\s*$/);
+      if (!m) return;
+      const attrs = {};
+      m[1].replace(/([\w-]+)\s*=\s*"([^"]*)"/g, (_, k, v) => { attrs[k] = v; return ''; });
+      const host = c.parentElement;
+      let target = c.previousElementSibling;
+      // A comment that landed alone in its own <p> describes whatever block
+      // came before that <p>.
+      if (!target && host && host !== holder && !host.textContent.trim()) {
+        target = host.previousElementSibling;
+        c.remove();
+        if (!host.textContent.trim() && !host.children.length) host.remove();
+      } else {
+        if (!target && host && host !== holder) target = host;
+        c.remove();
+      }
+      if (target && attrs.class) {
+        target.setAttribute('class', attrs.class);
+        // The marker contributed a space before the comment; drop the
+        // trailing whitespace it leaves behind in the block's text.
+        const last = target.lastChild;
+        if (last && last.nodeType === 3) last.nodeValue = last.nodeValue.replace(/\s+$/, '');
+      }
+    });
+    // marked wraps a lone image in a paragraph; reveal's r-stretch expects the
+    // image itself, so unwrap paragraphs holding nothing else.
+    Array.from(holder.querySelectorAll('p')).forEach(p => {
+      const kids = Array.from(p.childNodes).filter(n => n.nodeType !== 3 || n.nodeValue.trim());
+      if (kids.length === 1 && kids[0].nodeName === 'IMG') p.replaceWith(kids[0]);
+    });
+    return holder.innerHTML;
+  }
+
+  function projectToMarkdown(p) {
+    const td = makeMarkdownTurndown();
     const blocks = [];
     p.slides.forEach((s, i) => {
       if (i > 0) blocks.push(s.vertical ? '--' : '---');
@@ -2389,7 +2707,7 @@ ${sections}
     }
     if (attrs.length) parts.push(`<!-- .slide: ${attrs.join(' ')} -->`);
 
-    const body = td.turndown(s.content || '').trim();
+    const body = htmlToMarkdown(s.content || '', td).trim();
     if (body) parts.push(body);
 
     const notes = (s.notes || '').trim();
@@ -2678,7 +2996,7 @@ ${sections}
       body = body.slice(0, noteMatch.index).replace(/\s+$/, '');
     }
 
-    slide.content = body.trim() ? marked.parse(body) : '';
+    slide.content = body.trim() ? markdownToHtml(body) : '';
     return slide;
   }
 
@@ -4111,6 +4429,21 @@ ${sections}
       syncToolbarState();
     });
 
+    els.markdownBtn.addEventListener('click', () => {
+      if (markdownMode) closeMarkdownMode();
+      else openMarkdownMode();
+    });
+    els.markdownApply.addEventListener('click', applyMarkdownToDeck);
+    els.markdownRevert.addEventListener('click', () => {
+      const text = deckToMarkdownText();
+      els.markdownText.value = text;
+      markdownBaseline = text;
+      setMarkdownStatus('Reverted to the current deck');
+    });
+    els.markdownText.addEventListener('input', () => {
+      setMarkdownStatus(els.markdownText.value === markdownBaseline ? '' : 'Unapplied changes');
+    });
+
     els.blockStyle.addEventListener('change', () => {
       const tag = els.blockStyle.value;
       if (!tag) return;
@@ -4308,7 +4641,11 @@ ${sections}
     document.addEventListener('keydown', (e) => {
       const mod = e.metaKey || e.ctrlKey;
       const inEditor = e.target === els.editor || els.editor.contains(e.target);
-      if (mod && e.key === 's') { e.preventDefault(); saveProject(); }
+      if (mod && e.key === 's') {
+        e.preventDefault();
+        if (markdownMode) applyMarkdownToDeck();
+        saveProject();
+      }
       else if (mod && e.shiftKey && e.key === 'Enter') { e.preventDefault(); addSlide(); }
       else if (mod && (e.key === 'P' || e.key === 'p')) {
         e.preventDefault();

@@ -43,6 +43,7 @@
       <button id="btn-preview" type="button" class="primary" title="Preview the deck from the first slide (Ctrl/Cmd+P)"><i class="bi bi-play-fill" aria-hidden="true"></i>Preview</button>
       <button id="btn-preview-here" type="button" class="primary" title="Preview starting from the slide you're editing (Ctrl/Cmd+Shift+P)" aria-label="Preview from current slide">from here</button>
     </div>
+    <button id="btn-markdown" type="button" class="has-icon" title="Edit the whole deck as one markdown file" aria-pressed="false"><i class="bi bi-markdown" aria-hidden="true"></i>Markdown</button>
     <button id="btn-projects" type="button" title="Open, rename, duplicate, or export saved decks">Projects…</button>
     <button id="btn-new" type="button" title="Start a new deck">+ New</button>
     <span id="status" class="status" role="status"></span>
@@ -168,6 +169,20 @@
         </div>
         <textarea id="slide-notes" rows="2" placeholder="Notes shown in the speaker view"></textarea>
       </div>
+    </div>
+    <div id="markdown-pane" class="markdown-pane" hidden>
+      <div class="markdown-head">
+        <div class="markdown-about">
+          <strong>Deck markdown</strong>
+          <span class="markdown-hint">New slide on <code>---</code>, sub-slide on <code>--</code>, speaker notes after <code>Note:</code></span>
+        </div>
+        <div class="markdown-actions">
+          <span id="markdown-status" class="markdown-status" role="status"></span>
+          <button type="button" id="markdown-revert" title="Discard changes and regenerate from the deck">Revert</button>
+          <button type="button" id="markdown-apply" class="primary" title="Rebuild the deck from this markdown (Ctrl/Cmd+S)">Apply to deck</button>
+        </div>
+      </div>
+      <textarea id="markdown-text" spellcheck="false" aria-label="Deck markdown"></textarea>
     </div>
   </section>
 
