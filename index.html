@@ -9,8 +9,8 @@
 <meta name="referrer" content="no-referrer">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Reveal Editor</title>
-<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@phosphor-icons/web@2.1.1/src/regular/style.css"
-      integrity="sha384-6p9AefaqUhEVheRlj1mpAkbngHXy9mbYMrIdcIt4Jlc9lOLIablJq3bBsLOjGwZ7"
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css"
+      integrity="sha384-XGjxtQfXaH2tnPFa9x+ruJTuLE3Aa6LhHSWRr1XeTyhezb4abCG4ccI5AkVDxqC+"
       crossorigin="anonymous">
 <link rel="stylesheet" href="styles.css">
 </head>
@@ -22,8 +22,8 @@
   </div>
   <div class="topbar-actions">
     <label class="field">
-      Theme
-      <select id="theme-select">
+      Deck theme
+      <select id="theme-select" title="reveal.js theme used by this deck">
         <option value="black">black</option>
         <option value="white">white</option>
         <option value="league">league</option>
@@ -37,18 +37,20 @@
         <option value="moon">moon</option>
         <option value="custom">custom…</option>
       </select>
-      <button type="button" id="btn-theme-edit" title="Edit custom theme" aria-label="Edit custom theme" hidden><i class="ph ph-palette"></i></button>
+      <button type="button" id="btn-theme-edit" title="Edit custom theme" aria-label="Edit custom theme" hidden><i class="bi bi-palette"></i></button>
     </label>
-    <button id="btn-preview" type="button" title="Preview from start (P)">Preview</button>
-    <button id="btn-preview-here" type="button" title="Preview starting from the current slide (Shift+P)">Preview from Here</button>
-    <button id="btn-projects" type="button" title="Manage saved projects">Projects…</button>
-    <button id="btn-new" type="button" title="New deck">+ New</button>
-    <span id="status" class="status"></span>
+    <div class="btn-split" role="group" aria-label="Preview">
+      <button id="btn-preview" type="button" class="primary" title="Preview the deck from the first slide (Ctrl/Cmd+P)"><i class="bi bi-play-fill" aria-hidden="true"></i>Preview</button>
+      <button id="btn-preview-here" type="button" class="primary" title="Preview starting from the slide you're editing (Ctrl/Cmd+Shift+P)" aria-label="Preview from current slide">from here</button>
+    </div>
+    <button id="btn-projects" type="button" title="Open, rename, duplicate, or export saved decks">Projects…</button>
+    <button id="btn-new" type="button" title="Start a new deck">+ New</button>
+    <span id="status" class="status" role="status"></span>
   </div>
   <div class="topbar-utility">
-    <button id="btn-sync" type="button" class="sync-pill" title="Sync to GitHub Gist"><i class="ph ph-cloud-slash sync-icon" aria-hidden="true"></i><span class="sync-label">Sync: off</span></button>
-    <button id="btn-settings" type="button" title="reveal.js settings for this deck" aria-label="Settings"><i class="ph ph-gear-six"></i></button>
-    <button id="btn-theme-toggle" type="button" title="Toggle light/dark mode" aria-label="Toggle light/dark mode"><i class="ph ph-moon"></i></button>
+    <button id="btn-sync" type="button" class="sync-pill" title="Sync to GitHub Gist"><i class="bi bi-cloud-slash sync-icon" aria-hidden="true"></i><span class="sync-label">Sync: off</span></button>
+    <button id="btn-settings" type="button" title="reveal.js settings for this deck" aria-label="Settings"><i class="bi bi-sliders"></i></button>
+    <button id="btn-theme-toggle" type="button" title="Switch the editor between light and dark (does not affect the deck)" aria-label="Toggle editor light/dark mode"><i class="bi bi-moon"></i></button>
   </div>
 </header>
 
@@ -56,7 +58,7 @@
   <aside class="sidebar">
     <div class="sidebar-head">
       <span>Slides</span>
-      <button id="btn-add-slide" type="button" title="Add slide">+</button>
+      <button id="btn-add-slide" type="button" class="add-slide" title="Add a slide to the end of the deck (Ctrl/Cmd+Shift+Enter)" aria-label="Add slide"><i class="bi bi-plus-lg" aria-hidden="true"></i></button>
     </div>
     <ol id="slide-list" class="slide-list"></ol>
     <div class="sidebar-foot">
@@ -65,55 +67,47 @@
   </aside>
 
   <section class="editor">
-    <div class="toolbar" id="toolbar">
-      <button type="button" id="btn-undo" title="Undo (Ctrl/Cmd+Z)" aria-label="Undo" disabled><i class="ph ph-arrow-arc-left"></i></button>
-      <button type="button" id="btn-redo" title="Redo (Ctrl/Cmd+Shift+Z)" aria-label="Redo" disabled><i class="ph ph-arrow-arc-right"></i></button>
-      <span class="sep"></span>
-      <button type="button" data-cmd="formatBlock" data-arg="h1" title="Heading 1" aria-label="Heading 1"><i class="ph ph-text-h-one"></i></button>
-      <button type="button" data-cmd="formatBlock" data-arg="h2" title="Heading 2" aria-label="Heading 2"><i class="ph ph-text-h-two"></i></button>
-      <button type="button" data-cmd="formatBlock" data-arg="h3" title="Heading 3" aria-label="Heading 3"><i class="ph ph-text-h-three"></i></button>
-      <button type="button" data-cmd="formatBlock" data-arg="p" title="Paragraph" aria-label="Paragraph"><i class="ph ph-paragraph"></i></button>
-      <span class="sep"></span>
-      <button type="button" data-cmd="bold" title="Bold (Ctrl/Cmd+B)" aria-label="Bold"><i class="ph ph-text-b"></i></button>
-      <button type="button" data-cmd="italic" title="Italic (Ctrl/Cmd+I)" aria-label="Italic"><i class="ph ph-text-italic"></i></button>
-      <button type="button" data-cmd="underline" title="Underline" aria-label="Underline"><i class="ph ph-text-underline"></i></button>
-      <button type="button" data-cmd="strikeThrough" title="Strikethrough" aria-label="Strikethrough"><i class="ph ph-text-strikethrough"></i></button>
-      <span class="sep"></span>
-      <button type="button" data-cmd="insertUnorderedList" title="Bulleted list" aria-label="Bulleted list"><i class="ph ph-list-bullets"></i></button>
-      <button type="button" data-cmd="insertOrderedList" title="Numbered list" aria-label="Numbered list"><i class="ph ph-list-numbers"></i></button>
-      <button type="button" data-action="blockquote" title="Blockquote" aria-label="Blockquote"><i class="ph ph-quotes"></i></button>
-      <button type="button" data-action="code-inline" title="Inline code" aria-label="Inline code"><i class="ph ph-code"></i></button>
-      <button type="button" data-action="code-block" title="Code block" aria-label="Code block"><i class="ph ph-code-block"></i></button>
-      <span class="sep"></span>
-      <button type="button" data-action="link" title="Link" aria-label="Link"><i class="ph ph-link"></i></button>
-      <button type="button" data-action="image" title="Insert image" aria-label="Insert image"><i class="ph ph-image"></i></button>
-      <button type="button" data-action="linked-image" title="Linked image — clicks open a URL in a new window during the presentation (use for sites that refuse iframe embedding)" aria-label="Linked image"><i class="ph ph-image"></i><i class="ph ph-arrow-square-out btn-badge"></i></button>
-      <button type="button" data-action="hr" title="Horizontal rule" aria-label="Horizontal rule"><i class="ph ph-minus"></i></button>
-      <span class="sep"></span>
-      <button type="button" data-action="fit-text" title="Fit text to slide (r-fit-text)" aria-label="Fit text"><i class="ph ph-text-aa"></i></button>
-      <button type="button" data-action="stretch" title="Stretch to fill slide (r-stretch)" aria-label="Stretch to fill"><i class="ph ph-arrows-out-line-vertical"></i></button>
-      <span class="sep"></span>
-      <select id="fragment-type" class="toolbar-select" title="Fragment animation">
-        <option value="">fade-in</option>
-        <option value="fade-out">fade-out</option>
-        <option value="fade-up">fade-up</option>
-        <option value="fade-down">fade-down</option>
-        <option value="fade-left">fade-left</option>
-        <option value="fade-right">fade-right</option>
-        <option value="fade-in-then-out">fade-in-then-out</option>
-        <option value="fade-in-then-semi-out">fade-in-then-semi-out</option>
-        <option value="grow">grow</option>
-        <option value="shrink">shrink</option>
-        <option value="strike">strike</option>
-        <option value="highlight-red">highlight-red</option>
-        <option value="highlight-green">highlight-green</option>
-        <option value="highlight-blue">highlight-blue</option>
-        <option value="highlight-current-red">highlight-current-red</option>
-      </select>
-      <button type="button" data-action="fragment" title="Toggle fragment on current block, or wrap selection. Click again to remove." aria-label="Fragment"><i class="ph ph-magic-wand"></i></button>
-      <span class="sep"></span>
-      <button type="button" data-cmd="removeFormat" title="Clear formatting" aria-label="Clear formatting"><i class="ph ph-eraser"></i></button>
-      <button type="button" id="toggle-source" title="Toggle HTML source" aria-label="Toggle HTML source"><i class="ph ph-brackets-angle"></i></button>
+    <div class="toolbar" id="toolbar" role="toolbar" aria-label="Slide formatting">
+      <div class="tb-group" role="group" aria-label="History">
+        <button type="button" id="btn-undo" title="Undo (Ctrl/Cmd+Z)" aria-label="Undo" disabled><i class="bi bi-arrow-counterclockwise"></i></button>
+        <button type="button" id="btn-redo" title="Redo (Ctrl/Cmd+Shift+Z)" aria-label="Redo" disabled><i class="bi bi-arrow-clockwise"></i></button>
+      </div>
+      <div class="tb-group" role="group" aria-label="Paragraph style">
+        <select id="block-style" class="toolbar-select tb-style" aria-label="Paragraph style" title="Style of the block the cursor is in">
+          <option value="" disabled hidden>Mixed</option>
+          <option value="p">Body</option>
+          <option value="h1">Heading 1</option>
+          <option value="h2">Heading 2</option>
+          <option value="h3">Heading 3</option>
+          <option value="blockquote">Quote</option>
+        </select>
+      </div>
+      <div class="tb-group" role="group" aria-label="Text formatting">
+        <button type="button" data-cmd="bold" title="Bold (Ctrl/Cmd+B)" aria-label="Bold" aria-pressed="false"><i class="bi bi-type-bold"></i></button>
+        <button type="button" data-cmd="italic" title="Italic (Ctrl/Cmd+I)" aria-label="Italic" aria-pressed="false"><i class="bi bi-type-italic"></i></button>
+      </div>
+      <div class="tb-group" role="group" aria-label="Lists">
+        <button type="button" data-cmd="insertUnorderedList" title="Bulleted list" aria-label="Bulleted list" aria-pressed="false"><i class="bi bi-list-ul"></i></button>
+        <button type="button" data-cmd="insertOrderedList" title="Numbered list" aria-label="Numbered list" aria-pressed="false"><i class="bi bi-list-ol"></i></button>
+      </div>
+      <div class="tb-group" role="group" aria-label="Insert">
+        <button type="button" data-action="link" title="Link the selected text to a URL" aria-label="Link"><i class="bi bi-link-45deg"></i></button>
+        <button type="button" data-action="image" title="Insert an image from your computer" aria-label="Insert image"><i class="bi bi-image"></i></button>
+      </div>
+      <div class="tb-group" role="group" aria-label="Reveal.js sizing">
+        <button type="button" data-action="fit-text" title="Scale this block to fill the slide width (reveal.js r-fit-text)" aria-label="Fit text to slide" aria-pressed="false"><i class="bi bi-fonts"></i><span class="tb-label">Fit text</span></button>
+        <button type="button" data-action="stretch" title="Stretch this image or video to fill the remaining slide height (reveal.js r-stretch)" aria-label="Stretch to fill slide" aria-pressed="false"><i class="bi bi-arrows-expand"></i><span class="tb-label">Stretch</span></button>
+      </div>
+      <div class="tb-group tb-split" role="group" aria-label="Fragment">
+        <button type="button" data-action="fragment" title="Reveal this block on a separate click. Click again to remove." aria-label="Toggle fragment" aria-pressed="false"><i class="bi bi-magic"></i><span class="tb-label">Fragment</span></button>
+        <button type="button" id="btn-fragment-menu" class="tb-caret" aria-haspopup="menu" aria-expanded="false" aria-label="Fragment animation"><i class="bi bi-caret-down-fill"></i></button>
+      </div>
+      <div class="tb-group" role="group" aria-label="View">
+        <button type="button" id="toggle-source" title="Edit this slide as raw HTML" aria-label="Edit as HTML" aria-pressed="false"><i class="bi bi-braces"></i><span class="tb-label">HTML</span></button>
+      </div>
+      <div class="tb-group" role="group" aria-label="More tools">
+        <button type="button" id="btn-more" title="More formatting tools" aria-label="More tools" aria-haspopup="menu" aria-expanded="false"><i class="bi bi-three-dots"></i></button>
+      </div>
     </div>
 
     <div class="stage">
@@ -160,14 +154,17 @@
           <option value="contain">contain (show whole frame)</option>
         </select>
       </label>
-      <label class="field checkbox">
-        <input id="slide-vertical" type="checkbox" />
-        <span>Vertical sub-slide</span>
-      </label>
+      <div class="field">
+        <span>Position</span>
+        <label class="checkbox-inline" title="Nest this slide underneath the one before it, as a vertical sub-slide">
+          <input id="slide-vertical" type="checkbox" />
+          <span>Vertical sub-slide</span>
+        </label>
+      </div>
       <div class="field grow notes-field">
         <div class="notes-head">
           <span>Speaker notes</span>
-          <button type="button" id="btn-notes-popout" title="Open notes in a larger editor">⤢ Expand</button>
+          <button type="button" id="btn-notes-popout" title="Open notes in a larger side panel"><i class="bi bi-arrows-fullscreen" aria-hidden="true"></i>Expand</button>
         </div>
         <textarea id="slide-notes" rows="2" placeholder="Notes shown in the speaker view"></textarea>
       </div>
@@ -397,6 +394,7 @@
 </div>
 
 <div id="slide-context-menu" class="context-menu" role="menu" hidden></div>
+<div id="toolbar-menu" class="context-menu" role="menu" hidden></div>
 
 <input id="file-input" type="file" accept="image/*" hidden>
 

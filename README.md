@@ -11,6 +11,7 @@ A browser-based WYSIWYG editor for [reveal.js](https://revealjs.com) presentatio
 - **Visual slide editing.**
 - **Live theme preview.**
 - **Reveal.js formatting tools** like `r-fit-text`, `r-stretch`, and `fragments`.
+- **Editing toolbar.** The frequently used tools stay on one row: paragraph style, bold/italic, lists, link, image, Fit text, Stretch, Fragment, and HTML. Buttons light up to show what is already applied at the cursor. The rarer tools (underline, strikethrough, clear formatting, inline code, code block, horizontal rule, clickable image) live behind the `···` menu, and the fragment animation behind the caret next to **Fragment**.
 - **Slide Backgrounds.** Per-slide color, image, video, or iframe backgrounds. Embed entire webpages with just a URL.
 - **Vertical sub-slides.** Check "Vertical sub-slide" to nest under the previous one; reveal will lay them out as a vertical group. You can also drag a slide onto the middle of another one in the sidebar to make it a sub-slide — the top and bottom thirds of a row reorder as usual, the middle third drops *into* the target. Dragging a slide that has sub-slides carries them along.
 - **Speaker notes side panel.** Opens to the right of the slide so you can see the slide and notes at the same time. Notes also appear in the deck's reveal speaker view (press `S` during a preview).
@@ -114,6 +115,7 @@ Practical upshot: **only import project files from sources you trust.** Importin
 - [reveal.js 5.1.0](https://revealjs.com) — loaded from jsdelivr at runtime, also referenced in exported decks.
 - [JSZip 3.10.1](https://stuk.github.io/jszip/) — for the `.zip` import/export, pinned via SRI.
 - [turndown 7.2.0](https://github.com/mixmark-io/turndown) and [marked 13.0.3](https://marked.js.org/) — HTML↔Markdown conversion for the `.md` import/export, both pinned via SRI.
+- [Bootstrap Icons 1.11.3](https://icons.getbootstrap.com/) — toolbar and topbar icons, loaded from jsdelivr and pinned via SRI.
 
 The editor is five small files: `index.html`, `app.js`, `styles.css` for the editor itself, plus `preview.html` + `preview.js` for the sandboxed preview page. About 1,500 lines of JS for everything you see.
 

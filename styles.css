@@ -55,18 +55,46 @@ button {
   cursor: pointer;
 }
 button:hover { background: var(--button-hover); }
+/* Preview is the one action people reach for constantly; give it weight so
+   the topbar reads as one primary action among secondary ones. */
+button.primary {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: #fff;
+  font-weight: 500;
+}
+button.primary:hover {
+  background: color-mix(in srgb, var(--accent) 85%, #000);
+  border-color: color-mix(in srgb, var(--accent) 85%, #000);
+}
+/* "Preview" and "from here" read as one control with a dominant half. */
+.btn-split { display: inline-flex; }
+.btn-split button { border-radius: 0; }
+.btn-split button:first-child {
+  border-top-left-radius: 6px;
+  border-bottom-left-radius: 6px;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+}
+.btn-split button:last-child {
+  border-top-right-radius: 6px;
+  border-bottom-right-radius: 6px;
+  border-left: 1px solid color-mix(in srgb, #000 22%, var(--accent));
+  font-weight: 400;
+  opacity: .92;
+}
+.btn-split button:last-child:hover { opacity: 1; }
 button.danger { border-color: #5a3030; color: #ffb3b3; }
 button.danger:hover { background: #432626; }
 body.light button.danger { border-color: #f4c4c4; color: #b91c1c; }
 body.light button.danger:hover { background: #fbe1e1; }
 
 .topbar-utility {
-  position: absolute;
-  top: 10px;
-  right: 14px;
   display: flex;
   align-items: center;
   gap: 6px;
+  margin-left: auto;
 }
 #btn-theme-toggle,
 #btn-settings {
@@ -94,11 +122,10 @@ textarea { resize: vertical; }
   position: relative;
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  padding: 10px 200px 10px 14px;
+  padding: 10px 14px;
   border-bottom: 1px solid var(--border);
   background: var(--panel);
-  gap: 12px;
+  gap: 10px 16px;
   flex-wrap: wrap;
 }
 .brand { display: flex; align-items: center; gap: 12px; }
@@ -153,6 +180,16 @@ body.notes-open .layout {
   overflow-y: auto;
   flex: 1;
 }
+.add-slide {
+  width: 26px;
+  height: 26px;
+  padding: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+.add-slide .bi { font-size: 14px; }
+
 .slide-list li {
   background: var(--panel-2);
   border: 1px solid var(--border);
@@ -222,10 +259,10 @@ body.notes-open .layout {
 }
 .slide-list .del:hover { color: var(--danger); background: transparent; }
 
-/* Phosphor icon sizing in our buttons. The .ph base class sets font-family
-   and line-height; we control the visual size per location. */
-.toolbar button .ph {
-  font-size: 16px;
+/* Icon sizing in our buttons. The .bi base class sets font-family; we
+   control the visual size per location. */
+.toolbar button .bi {
+  font-size: 15px;
   vertical-align: middle;
 }
 .toolbar button:disabled {
@@ -233,15 +270,6 @@ body.notes-open .layout {
   cursor: not-allowed;
 }
 .toolbar button:disabled:hover { background: var(--panel-2); }
-/* Linked-image button gets a small "external" badge stacked next to the
-   primary icon — visually distinguishes it from the plain Image button. */
-.toolbar button .ph.btn-badge {
-  font-size: 10px;
-  margin-left: -2px;
-  vertical-align: super;
-  opacity: .85;
-}
-
 /* Sidebar slide-list label icon */
 .slide-list .label .label-icon {
   font-size: 13px;
@@ -251,7 +279,7 @@ body.notes-open .layout {
 }
 
 /* Editor background badge icon */
-.slide-bg-badge .ph {
+.slide-bg-badge .bi {
   font-size: 12px;
   margin-right: 4px;
   vertical-align: -1px;
@@ -269,9 +297,9 @@ body.notes-open .layout {
 @keyframes sync-spin { to { transform: rotate(360deg); } }
 
 /* Topbar utility-cluster icon size matches the 32x32 button box. */
-#btn-theme-toggle .ph,
-#btn-settings .ph {
-  font-size: 16px;
+#btn-theme-toggle .bi,
+#btn-settings .bi {
+  font-size: 15px;
 }
 
 /* Context menu (right-click on slides in the sidebar) */
@@ -336,35 +364,93 @@ body.light .context-menu button.danger { color: #b91c1c; }
 .toolbar {
   display: flex;
   flex-wrap: wrap;
-  gap: 4px;
+  align-items: center;
+  gap: 4px 8px;
   padding: 8px 12px;
   border-bottom: 1px solid var(--border);
   background: var(--panel);
 }
+/* Clusters wrap as a unit, so a group never splits across two rows the way
+   loose buttons separated by <span class="sep"> used to. */
+.tb-group {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+.tb-group + .tb-group {
+  border-left: 1px solid var(--border);
+  padding-left: 8px;
+}
 .toolbar button {
   padding: 4px 8px;
   font-size: 12px;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+}
+/* Reveal.js-specific tools carry a word as well as a glyph — "fit text",
+   "stretch" and "fragment" have no icon convention to lean on. */
+.tb-label {
+  font-size: 11px;
+  letter-spacing: .2px;
 }
 /* Pressed-in state (e.g. source view toggled on) — theme-aware, unlike a
    hardcoded background color. */
-.toolbar button.active {
+.toolbar button.active,
+.toolbar button[aria-pressed="true"] {
   border-color: var(--accent);
   background: color-mix(in srgb, var(--accent) 18%, var(--input-bg));
+  color: var(--text);
 }
-.toolbar-select {
-  padding: 3px 6px;
-  font-size: 12px;
-  max-width: 140px;
-  transition: border-color .15s, background .15s;
+/* Split control: the main action and its caret share one outline. */
+.tb-split { gap: 0; }
+.tb-split button:first-child {
+  border-top-right-radius: 0;
+  border-bottom-right-radius: 0;
 }
-.toolbar-select.bound {
+.tb-split button:last-child {
+  border-top-left-radius: 0;
+  border-bottom-left-radius: 0;
+  border-left: 0;
+  padding-left: 5px;
+  padding-right: 5px;
+}
+.tb-caret .bi { font-size: 10px; }
+/* Caret goes accent-coloured when the caret sits inside a fragment, so the
+   menu shows that fragment's animation rather than the default. */
+.tb-caret.bound {
   border-color: var(--accent);
   background: color-mix(in srgb, var(--accent) 12%, var(--input-bg));
 }
-.toolbar .sep {
-  width: 1px;
-  background: var(--border);
-  margin: 2px 6px;
+.tb-style { min-width: 108px; }
+
+/* Toolbar popover menus (More, fragment animation) */
+.context-menu .menu-tick {
+  display: inline-block;
+  width: 14px;
+  margin-right: 6px;
+  font-size: 11px;
+  vertical-align: -1px;
+  color: var(--accent);
+}
+.context-menu .menu-hint {
+  margin-left: 8px;
+  color: var(--muted);
+  font-size: 11px;
+}
+#toolbar-menu button { white-space: nowrap; }
+
+.toolbar-select {
+  padding: 0 6px;
+  font-size: 12px;
+  max-width: 140px;
+  height: 26px;
+  box-sizing: border-box;
+  transition: border-color .15s, background .15s;
+}
+.toolbar button {
+  height: 26px;
+  box-sizing: border-box;
 }
 
 .stage {
@@ -572,8 +658,16 @@ body.light .context-menu button.danger { color: #b91c1c; }
   flex-wrap: wrap;
 }
 .meta .field { align-items: flex-start; flex-direction: column; }
-.meta .field.checkbox { flex-direction: row; align-items: center; gap: 6px; padding-top: 18px; }
-.meta .field.checkbox input { margin: 0; }
+.meta .checkbox-inline {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--text);
+  font-size: 13px;
+  /* Line up with the sibling fields' inputs, which sit under a 12px label. */
+  min-height: 29px;
+}
+.meta .checkbox-inline input { margin: 0; }
 .meta input[type=text], .meta select { min-width: 180px; }
 .meta input[type=text]:disabled { opacity: .5; cursor: not-allowed; }
 .meta textarea { width: 100%; min-width: 280px; }
@@ -589,6 +683,9 @@ body.light .context-menu button.danger { color: #b91c1c; }
 .meta .notes-head button {
   padding: 2px 8px;
   font-size: 11px;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
 }
 
 /* Modal */

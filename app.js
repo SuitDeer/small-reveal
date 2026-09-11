@@ -61,6 +61,10 @@
     bgBadge: $('#slide-bg-badge'),
     dropOverlay: $('#drop-overlay'),
     slideMenu: $('#slide-context-menu'),
+    toolbarMenu: $('#toolbar-menu'),
+    blockStyle: $('#block-style'),
+    fragmentMenuBtn: $('#btn-fragment-menu'),
+    moreBtn: $('#btn-more'),
     transition: $('#slide-transition'),
     bgType: $('#slide-bg-type'),
     bgValue: $('#slide-bg-value'),
@@ -68,7 +72,6 @@
     bgSize: $('#slide-bg-size'),
     bgSizeField: $('#slide-bg-size-field'),
     vertical: $('#slide-vertical'),
-    fragmentType: $('#fragment-type'),
     notes: $('#slide-notes'),
     status: $('#status'),
     fileInput: $('#file-input'),
@@ -127,6 +130,15 @@
     'grow', 'shrink', 'strike',
     'highlight-red', 'highlight-green', 'highlight-blue', 'highlight-current-red'
   ];
+
+  // Human labels for the fragment animation menu. '' is reveal's default.
+  const FRAGMENT_LABELS = [['', 'fade-in (default)']]
+    .concat(FRAGMENT_TYPES.map(t => [t, t]));
+
+  // Animation applied to the next fragment created. Previously this lived in
+  // the toolbar's <select>; the select is gone, so the preference lives here
+  // and surfaces through the Fragment button's caret menu.
+  let fragmentDefaultType = '';
 
   // Background types for which reveal.js honors data-background-size.
   const BG_FIT_TYPES = ['image', 'video'];
@@ -815,7 +827,7 @@
     return v > 0 ? `${h}.${v}` : String(h);
   }
 
-  // Returns { icon, text } so renderers can put a Phosphor <i> next to the
+  // Returns { icon, text } so renderers can put an icon <i> next to the
   // text instead of mixing emoji into the textContent.
   function slideLabel(slide) {
     const tmp = parseHtml(slide.content);
@@ -836,10 +848,10 @@
   }
 
   const BG_ICONS = {
-    image: 'ph-image',
-    video: 'ph-video-camera',
-    iframe: 'ph-globe',
-    color: 'ph-paint-brush',
+    image: 'bi-image',
+    video: 'bi-camera-video',
+    iframe: 'bi-globe',
+    color: 'bi-brush',
   };
 
   function backgroundLabel(bg) {
@@ -870,7 +882,7 @@
     el.replaceChildren();
     if (label.icon) {
       const i = document.createElement('i');
-      i.className = 'ph ' + label.icon + ' label-icon';
+      i.className = 'bi ' + label.icon + ' label-icon';
       el.appendChild(i);
     }
     el.appendChild(document.createTextNode(label.text));
@@ -894,6 +906,7 @@
     syncNotesPanel();
     applySlideEffects();
     applyEditorBackground();
+    syncToolbarState();
   }
 
   // Visualizes the current slide's background in the editor: color/image as
@@ -946,7 +959,7 @@
     const iconClass = BG_ICONS[type];
     if (iconClass) {
       const i = document.createElement('i');
-      i.className = 'ph ' + iconClass;
+      i.className = 'bi ' + iconClass;
       badge.appendChild(i);
     }
     badge.appendChild(document.createTextNode(`${label}: ${display}`));
@@ -1566,23 +1579,232 @@
   // Keeps the dropdown's selected option in sync with the fragment under the
   // cursor. If no fragment is active, the dropdown reverts to the user's last
   // manually chosen default (stored on the element).
+  // -------- Toolbar popover menus --------
+  // The rarely-used tools live behind the "More" button and the fragment
+  // animation behind a caret, so the always-visible row stays short enough
+  // to fit one line on a laptop. Both reuse the slide context menu's styling.
+  let toolbarMenuAnchor = null;
+
+  function openToolbarMenu(anchor, items) {
+    const menu = els.toolbarMenu;
+    menu.replaceChildren();
+    items.forEach(item => {
+      if (item.sep) {
+        const sep = document.createElement('span');
+        sep.className = 'sep';
+        menu.appendChild(sep);
+        return;
+      }
+      const btn = document.createElement('button');
+      btn.type = 'button';
+      btn.setAttribute('role', item.toggle ? 'menuitemcheckbox' : 'menuitemradio');
+      if (item.checked != null) btn.setAttribute('aria-checked', item.checked ? 'true' : 'false');
+      const tick = document.createElement('i');
+      tick.className = 'bi bi-check2 menu-tick';
+      tick.setAttribute('aria-hidden', 'true');
+      if (!item.checked) tick.style.visibility = 'hidden';
+      btn.appendChild(tick);
+      btn.appendChild(document.createTextNode(item.label));
+      if (item.hint) {
+        const hint = document.createElement('span');
+        hint.className = 'menu-hint';
+        hint.textContent = item.hint;
+        btn.appendChild(hint);
+      }
+      if (item.disabled) btn.disabled = true;
+      btn.addEventListener('click', () => {
+        closeToolbarMenu(false);
+        // Menu items live outside the editor, so put the caret back where it
+        // was before running a command that acts on the selection.
+        restoreEditorSelection();
+        item.action();
+      });
+      menu.appendChild(btn);
+    });
+
+    menu.hidden = false;
+    const a = anchor.getBoundingClientRect();
+    const m = menu.getBoundingClientRect();
+    let left = a.left;
+    let top = a.bottom + 4;
+    if (left + m.width > window.innerWidth) left = Math.max(4, window.innerWidth - m.width - 4);
+    if (top + m.height > window.innerHeight) top = Math.max(4, a.top - m.height - 4);
+    menu.style.left = left + 'px';
+    menu.style.top = top + 'px';
+    toolbarMenuAnchor = anchor;
+    anchor.setAttribute('aria-expanded', 'true');
+    const first = menu.querySelector('button[aria-checked="true"]:not(:disabled)')
+      || menu.querySelector('button:not(:disabled)');
+    if (first) first.focus();
+  }
+
+  function closeToolbarMenu(returnFocus = true) {
+    if (els.toolbarMenu.hidden) return;
+    const hadFocus = els.toolbarMenu.contains(document.activeElement);
+    els.toolbarMenu.hidden = true;
+    if (toolbarMenuAnchor) {
+      toolbarMenuAnchor.setAttribute('aria-expanded', 'false');
+      if (returnFocus && hadFocus) toolbarMenuAnchor.focus();
+    }
+    toolbarMenuAnchor = null;
+  }
+
+  function cmdState(cmd) {
+    try { return document.queryCommandState(cmd); } catch { return false; }
+  }
+
+  function runCmd(cmd, arg = null) {
+    recordHistory();
+    execCmd(cmd, arg);
+    syncToolbarState();
+  }
+
+  function openMoreMenu() {
+    if (toolbarMenuAnchor === els.moreBtn) { closeToolbarMenu(); return; }
+    const el = selectionElement();
+    const inPre = !!(el && el.closest('pre'));
+    openToolbarMenu(els.moreBtn, [
+      { label: 'Underline', toggle: true, checked: cmdState('underline'),
+        action: () => runCmd('underline') },
+      { label: 'Strikethrough', toggle: true, checked: cmdState('strikeThrough'),
+        action: () => runCmd('strikeThrough') },
+      { label: 'Clear formatting', checked: false, action: () => runCmd('removeFormat') },
+      { sep: true },
+      { label: 'Inline code', toggle: true,
+        checked: !!(el && el.closest('code') && !inPre),
+        action: () => handleToolbarAction('code-inline') },
+      { label: 'Code block', toggle: true, checked: inPre,
+        action: () => handleToolbarAction('code-block') },
+      { label: 'Horizontal rule', checked: false, action: () => handleToolbarAction('hr') },
+      { sep: true },
+      { label: 'Clickable image…', checked: false, hint: 'opens a URL',
+        action: () => handleToolbarAction('linked-image') },
+    ]);
+  }
+
+  function openFragmentMenu() {
+    if (toolbarMenuAnchor === els.fragmentMenuBtn) { closeToolbarMenu(); return; }
+    const frag = getActiveFragment();
+    const current = frag ? getFragmentTypeOf(frag) : fragmentDefaultType;
+    openToolbarMenu(els.fragmentMenuBtn, FRAGMENT_LABELS.map(([value, label]) => ({
+      label,
+      checked: value === current,
+      action: () => {
+        const target = getActiveFragment();
+        if (target) {
+          // Retype the fragment the caret is in.
+          recordHistory();
+          setFragmentTypeOn(target, value);
+          onEditorInput();
+        } else {
+          fragmentDefaultType = value;
+        }
+        syncFragmentDropdown();
+      },
+    })));
+  }
+
+  // -------- Toolbar state reflection --------
+  // A WYSIWYG toolbar should show what is already applied at the caret.
+  // Without it every button looks like a one-shot action and there is no way
+  // to tell you are sitting inside a heading, a list, or a fragment.
+  const TOOLBAR_STATE_CMDS = ['bold', 'italic', 'insertUnorderedList', 'insertOrderedList'];
+  // Values the paragraph-style <select> can represent. Anything else (a list
+  // item, say) leaves it showing the disabled "Mixed" placeholder.
+  const BLOCK_STYLES = ['p', 'h1', 'h2', 'h3', 'blockquote'];
+
+  let tbRefs = null;
+  function toolbarRefs() {
+    if (tbRefs) return tbRefs;
+    const q = (sel) => els.toolbar.querySelector(sel);
+    tbRefs = {
+      cmds: Object.fromEntries(
+        TOOLBAR_STATE_CMDS.map(c => [c, q(`button[data-cmd="${c}"]`)])),
+      fitText: q('button[data-action="fit-text"]'),
+      stretch: q('button[data-action="stretch"]'),
+      fragment: q('button[data-action="fragment"]'),
+      commandButtons: els.toolbar.querySelectorAll('button[data-cmd], button[data-action]'),
+    };
+    return tbRefs;
+  }
+
+  function setPressed(btn, on) {
+    if (!btn) return;
+    const v = on ? 'true' : 'false';
+    if (btn.getAttribute('aria-pressed') !== v) btn.setAttribute('aria-pressed', v);
+  }
+
+  // Nearest element to the caret, or null when the selection is outside the
+  // slide editor. Shared by the state sync and the "More" menu, which needs
+  // the same context to tick its checkboxes.
+  function selectionElement() {
+    const sel = window.getSelection();
+    const node = sel && sel.rangeCount ? sel.getRangeAt(0).commonAncestorContainer : null;
+    if (!node || !(els.editor === node || els.editor.contains(node))) return null;
+    return node.nodeType === 1 ? node : node.parentElement;
+  }
+
+  function syncToolbarState() {
+    const refs = toolbarRefs();
+    // In HTML source view the rich-text commands have nothing to act on, so
+    // grey them out instead of leaving dead buttons enabled.
+    refs.commandButtons.forEach(btn => { btn.disabled = sourceMode; });
+    els.blockStyle.disabled = sourceMode;
+    els.fragmentMenuBtn.disabled = sourceMode;
+    els.moreBtn.disabled = sourceMode;
+    setPressed(els.toggleSource, sourceMode);
+    if (sourceMode) {
+      els.toolbar.querySelectorAll('button[aria-pressed]').forEach(btn => {
+        if (btn !== els.toggleSource) setPressed(btn, false);
+      });
+      return;
+    }
+
+    // queryCommandState reads the *live* selection, so when focus has left
+    // the editor there is nothing meaningful to report — leave the last
+    // known state up rather than blanking the toolbar.
+    const el = selectionElement();
+    if (!el) return;
+
+    TOOLBAR_STATE_CMDS.forEach(cmd => {
+      let on = false;
+      try { on = document.queryCommandState(cmd); } catch {}
+      setPressed(refs.cmds[cmd], on);
+    });
+
+    let block = '';
+    try { block = String(document.queryCommandValue('formatBlock') || '').toLowerCase(); } catch {}
+    if (!BLOCK_STYLES.includes(block) && el.closest('blockquote')) block = 'blockquote';
+    const styleValue = BLOCK_STYLES.includes(block) ? block : '';
+    if (els.blockStyle.value !== styleValue) els.blockStyle.value = styleValue;
+
+    const inside = (selector) => {
+      const hit = el.closest(selector);
+      return !!(hit && els.editor.contains(hit));
+    };
+    setPressed(refs.fitText, inside('.r-fit-text'));
+    setPressed(refs.stretch, inside('.r-stretch'));
+    setPressed(refs.fragment, !!getActiveFragment());
+  }
+
+  // The fragment animation no longer has a permanent <select>; the caret
+  // button next to Fragment carries the current value in its tooltip and
+  // accessible name, and opens the full list on click.
   function syncFragmentDropdown() {
     if (sourceMode) return;
     const frag = getActiveFragment();
-    const target = frag
-      ? getFragmentTypeOf(frag)
-      : (els.fragmentType.dataset.userDefault || '');
-    if (els.fragmentType.value !== target) {
-      els.fragmentType.value = target;
-    }
-    els.fragmentType.classList.toggle('bound', !!frag);
-    els.fragmentType.title = frag
-      ? "Changing this updates this fragment's animation"
-      : 'Animation for the next fragment you add';
+    const type = frag ? getFragmentTypeOf(frag) : fragmentDefaultType;
+    const shown = type || 'fade-in';
+    const btn = els.fragmentMenuBtn;
+    btn.classList.toggle('bound', !!frag);
+    btn.title = frag
+      ? `Animation for this fragment: ${shown}. Click to change.`
+      : `Animation for the next fragment you add: ${shown}. Click to change.`;
+    btn.setAttribute('aria-label', `Fragment animation: ${shown}`);
   }
 
   function toggleFragment() {
-    const type = els.fragmentType.value;
+    const type = fragmentDefaultType;
     // For fragment work we DO need the live selection — wrapping spans
     // around a highlighted range uses range.extractContents. Restore the
     // cached selection first so the wrap honours what the user selected
@@ -1680,6 +1902,7 @@
       decorateFragments();
       applySlideEffects();
     }
+    syncToolbarState();
     scheduleLabelUpdate();
     scheduleSave();
   }
@@ -3181,11 +3404,11 @@ ${sections}
     document.body.classList.toggle('light', light);
     if (els.themeToggle) {
       // Light mode shows a moon (click to go dark); dark mode shows a sun
-      // (click to go light). Phosphor icon classes are toggled on the <i>.
+      // (click to go light). Bootstrap Icons name classes are toggled on the <i>.
       const icon = els.themeToggle.querySelector('i');
       if (icon) {
-        icon.classList.toggle('ph-moon', light);
-        icon.classList.toggle('ph-sun', !light);
+        icon.classList.toggle('bi-moon', light);
+        icon.classList.toggle('bi-sun', !light);
       }
       els.themeToggle.title = light ? 'Switch to dark mode' : 'Switch to light mode';
     }
@@ -3304,11 +3527,11 @@ ${sections}
   }
 
   const SYNC_ICONS = {
-    off: 'ph-cloud-slash',
-    syncing: 'ph-spinner-gap',
-    error: 'ph-cloud-warning',
-    ok: 'ph-cloud-check',
-    idle: 'ph-cloud',
+    off: 'bi-cloud-slash',
+    syncing: 'bi-arrow-repeat',
+    error: 'bi-exclamation-triangle',
+    ok: 'bi-cloud-check',
+    idle: 'bi-cloud',
   };
 
   function updateSyncPill() {
@@ -3336,7 +3559,7 @@ ${sections}
     const labelEl = pill.querySelector('.sync-label');
     if (icon) {
       // Reset to base classes, then add the state icon.
-      icon.className = 'ph sync-icon ' + SYNC_ICONS[iconKey];
+      icon.className = 'bi sync-icon ' + SYNC_ICONS[iconKey];
     }
     if (labelEl) labelEl.textContent = label;
     else pill.textContent = label;
@@ -3885,21 +4108,20 @@ ${sections}
     document.addEventListener('selectionchange', () => {
       rememberEditorRange();
       syncFragmentDropdown();
+      syncToolbarState();
     });
 
-    els.fragmentType.addEventListener('change', () => {
-      const frag = getActiveFragment();
-      if (frag) {
-        // Update the currently-selected fragment in place.
-        setFragmentTypeOn(frag, els.fragmentType.value);
-        onEditorInput();
-      } else {
-        // No active fragment: remember the user's choice as the default for
-        // the next fragment, and stop syncFragmentDropdown from overwriting
-        // it on the next selectionchange.
-        els.fragmentType.dataset.userDefault = els.fragmentType.value;
-      }
+    els.blockStyle.addEventListener('change', () => {
+      const tag = els.blockStyle.value;
+      if (!tag) return;
+      recordHistory();
+      restoreEditorSelection();
+      execCmd('formatBlock', tag);
+      syncToolbarState();
     });
+
+    els.fragmentMenuBtn.addEventListener('click', openFragmentMenu);
+    els.moreBtn.addEventListener('click', openMoreMenu);
 
     // Stop toolbar buttons from stealing focus from the editor — otherwise
     // contenteditable loses its selection before the click handler runs.
@@ -3924,6 +4146,7 @@ ${sections}
         // not leave a no-op undo entry behind.
         handleToolbarAction(action);
       }
+      syncToolbarState();
     });
 
     els.toggleSource.addEventListener('click', () => {
@@ -3931,7 +4154,7 @@ ${sections}
       sourceMode = !sourceMode;
       els.editor.hidden = sourceMode;
       els.source.hidden = !sourceMode;
-      els.toggleSource.classList.toggle('active', sourceMode);
+      syncToolbarState();
       renderEditor();
     });
 
@@ -4106,7 +4329,8 @@ ${sections}
         e.preventDefault(); redo();
       }
       else if (e.key === 'Escape') {
-        if (!els.slideMenu.hidden) hideSlideContextMenu();
+        if (!els.toolbarMenu.hidden) closeToolbarMenu();
+        else if (!els.slideMenu.hidden) hideSlideContextMenu();
         else if (!els.previewModal.hidden) closePreview();
         else if (!els.projectsModal.hidden) closeProjectsModal();
         else if (!els.themeModal.hidden) closeThemeModal();
@@ -4130,13 +4354,38 @@ ${sections}
       btns[next].focus();
     });
 
-    // Dismiss the slide context menu on outside click, scroll, or window blur.
-    document.addEventListener('mousedown', (e) => {
-      if (els.slideMenu.hidden) return;
-      if (!els.slideMenu.contains(e.target)) hideSlideContextMenu();
+    els.toolbarMenu.addEventListener('keydown', (e) => {
+      if (e.key !== 'ArrowDown' && e.key !== 'ArrowUp') return;
+      e.preventDefault();
+      const btns = Array.from(els.toolbarMenu.querySelectorAll('button:not(:disabled)'));
+      if (!btns.length) return;
+      const i = btns.indexOf(document.activeElement);
+      const next = e.key === 'ArrowDown'
+        ? (i + 1) % btns.length
+        : (i - 1 + btns.length) % btns.length;
+      btns[next].focus();
     });
-    window.addEventListener('scroll', hideSlideContextMenu, true);
-    window.addEventListener('blur', hideSlideContextMenu);
+
+    // Keep the caret in the editor when a menu item is clicked, exactly as
+    // the toolbar itself does — otherwise contenteditable drops the range
+    // before the handler runs.
+    els.toolbarMenu.addEventListener('mousedown', (e) => {
+      if (e.target.closest('button')) e.preventDefault();
+    });
+
+    // Dismiss menus on outside click, scroll, or window blur.
+    document.addEventListener('mousedown', (e) => {
+      if (!els.slideMenu.hidden && !els.slideMenu.contains(e.target)) hideSlideContextMenu();
+      if (!els.toolbarMenu.hidden
+          && !els.toolbarMenu.contains(e.target)
+          && e.target !== toolbarMenuAnchor
+          && !(toolbarMenuAnchor && toolbarMenuAnchor.contains(e.target))) {
+        closeToolbarMenu(false);
+      }
+    });
+    const dismissMenus = () => { hideSlideContextMenu(); closeToolbarMenu(false); };
+    window.addEventListener('scroll', dismissMenus, true);
+    window.addEventListener('blur', dismissMenus);
 
     setupDropZone();
     setupPaste();
