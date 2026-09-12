@@ -1162,3 +1162,390 @@ body.light .sync-error { color: #b91c1c; }
 .about-body p:last-child { margin-bottom: 0; }
 .about-body a { color: var(--accent); }
 .about-version { color: var(--muted); font-size: 12px; }
+
+/* ==========================================================================
+   Small screens
+   ==========================================================================
+   The desktop shell shows everything at once: a slide list, a full topbar, a
+   formatting toolbar and a per-slide meta strip. On a phone that leaves the
+   slide — the thing being edited — as a letterbox in the middle. So on small
+   screens the slide takes the stage and the surrounding chrome collapses into
+   three places you pull open: the slide list becomes a left drawer, the meta
+   strip becomes a bottom sheet, and the rest of the topbar becomes one "⋯"
+   menu. Nothing is duplicated — the mobile controls drive the same elements
+   and handlers the desktop chrome does.
+
+   These four are mobile-only, so they start hidden and the media query below
+   turns them on. */
+#btn-mobile-menu,
+.sidebar-close,
+.mobile-slidebar,
+.mobile-scrim,
+.meta-sheet-head,
+.slide-list .row-menu { display: none; }
+
+/* Phones, plus phone-sized landscape windows where the vertical space is the
+   binding constraint. Kept in sync with MOBILE_QUERY in app.js. */
+@media (max-width: 760px), (max-height: 500px) and (max-width: 950px) {
+  /* --viewport-height is the visual viewport, set by syncViewportHeight() in
+     app.js: when the on-screen keyboard opens it is the only measure that
+     shrinks, so without it the bottom strip and the toolbar are pushed under
+     the keyboard exactly when they're wanted. It falls back to 100dvh, which
+     tracks the browser's collapsing URL bar the way svh/lvh do not. */
+  html, body { height: var(--viewport-height, 100dvh); }
+
+  /* iOS Safari zooms the whole page when a control smaller than 16px takes
+     focus, which leaves the editor scrolled sideways. */
+  select,
+  input[type=text],
+  input[type=password],
+  input[type=number],
+  textarea { font-size: 16px; }
+
+  /* ---- Topbar: deck title, Preview, and the overflow menu ---- */
+  .topbar {
+    padding: 6px 8px;
+    padding-top: max(6px, env(safe-area-inset-top));
+    gap: 6px;
+    flex-wrap: nowrap;
+  }
+  .brand { flex: 1; min-width: 0; gap: 0; }
+  /* The app's own name is the one thing on this bar that never does anything;
+     it lives in the About item of the ⋯ menu. */
+  .brand strong { display: none; }
+  #deck-title {
+    width: 100%;
+    min-width: 0;
+    background: transparent;
+    border-color: transparent;
+    font-weight: 600;
+    padding: 7px 4px;
+  }
+  #deck-title:focus {
+    background: var(--input-bg);
+    border-color: var(--border);
+  }
+
+  .topbar-actions { flex: 0 0 auto; flex-wrap: nowrap; gap: 6px; }
+  /* Theme picker, Markdown, Projects, + New and the save status all reappear
+     inside the ⋯ menu. */
+  .topbar-actions > .field,
+  .topbar-actions > #btn-markdown,
+  .topbar-actions > #btn-projects,
+  .topbar-actions > #btn-new,
+  .topbar-actions > .status { display: none; }
+  /* "from here" is a menu item on mobile; Preview keeps only its glyph. */
+  #btn-preview-here { display: none; }
+  .btn-split button:first-child { border-radius: 6px; }
+  #btn-preview {
+    width: 40px;
+    height: 38px;
+    padding: 0;
+    justify-content: center;
+    gap: 0;
+  }
+  #btn-preview .bi { font-size: 20px; }
+  /* The label is a text node, not an element, so it can't be hidden directly;
+     collapse it and let the icon's own font-size stand. */
+  #btn-preview { font-size: 0; }
+
+  .topbar-utility { gap: 4px; flex: 0 0 auto; }
+  #btn-sync,
+  #btn-settings,
+  #btn-theme-toggle { display: none; }
+  #btn-mobile-menu {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 38px;
+    height: 38px;
+    padding: 0;
+  }
+  #btn-mobile-menu .bi { font-size: 18px; }
+
+  /* ---- Slide list as a left drawer ----
+     The drawer, the sheet, the notes panel and the backdrop are all anchored
+     to .layout rather than the viewport. Fixed positioning is measured
+     against the layout viewport, which the on-screen keyboard does not
+     shrink — a bottom-anchored sheet would sit behind the keyboard. .layout
+     does shrink, because --viewport-height shortens the shell. */
+  .layout,
+  body.notes-open .layout { grid-template-columns: 1fr; }
+  .layout { position: relative; }
+
+  .sidebar {
+    position: absolute;
+    z-index: 90;
+    top: 0;
+    bottom: 0;
+    left: 0;
+    width: min(320px, 86vw);
+    padding-bottom: env(safe-area-inset-bottom);
+    transform: translateX(-100%);
+    transition: transform .22s ease;
+    box-shadow: 10px 0 34px rgba(0, 0, 0, .45);
+  }
+  body.slides-open .sidebar { transform: none; }
+
+  .sidebar-head { gap: 8px; padding: 12px; }
+  .sidebar-head > span { flex: 1; font-size: 15px; }
+  .sidebar-close {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 34px;
+    height: 34px;
+    padding: 0;
+  }
+  .add-slide { width: 34px; height: 34px; }
+  .add-slide .bi { font-size: 16px; }
+
+  .slide-list { padding: 8px 10px; }
+  .slide-list li { padding: 11px 10px; }
+  .slide-list .label { font-size: 14px; }
+  /* A 16px "×" next to a full-width tap target is an accidental deletion
+     waiting to happen; Delete lives in the row menu instead, and reordering
+     lives there too since dragging rows is a mouse gesture. */
+  .slide-list .del { display: none; }
+  .slide-list .row-menu {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 34px;
+    height: 34px;
+    margin: -6px -4px;
+    padding: 0;
+    background: transparent;
+    border: none;
+    color: var(--muted);
+    font-size: 16px;
+  }
+  .sidebar-foot { padding: 10px 12px; }
+  .sidebar-foot button { font-size: 14px; padding: 6px 8px; }
+
+  .mobile-scrim {
+    display: block;
+    position: absolute;
+    inset: 0;
+    z-index: 80;
+    background: rgba(0, 0, 0, .5);
+  }
+
+  /* ---- Toolbar: one scrolling row of icon-only buttons ----
+     It stays above the stage rather than under it: pinned to the bottom it
+     would sit behind the on-screen keyboard exactly when it's wanted. */
+  .toolbar {
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    overscroll-behavior-x: contain;
+    scrollbar-width: none;
+    gap: 0 6px;
+    padding: 6px 8px;
+  }
+  .toolbar::-webkit-scrollbar { display: none; }
+  .tb-group { flex: 0 0 auto; }
+  .toolbar button {
+    height: 38px;
+    min-width: 38px;
+    padding: 0 7px;
+    justify-content: center;
+  }
+  .toolbar button .bi { font-size: 17px; }
+  .tb-label { display: none; }
+  .toolbar-select,
+  .tb-style {
+    height: 38px;
+    min-width: 96px;
+    max-width: 116px;
+  }
+  .tb-split button:last-child { min-width: 26px; padding: 0 4px; }
+  /* Whole groups, not single buttons — hiding a lone button would leave the
+     group's divider behind as a stray sliver. Both reappear in "More". */
+  .tb-group[aria-label="Reveal.js sizing"],
+  .tb-group[aria-label="View"] { display: none; }
+
+  /* ---- Stage: the slide, as large as the width allows ---- */
+  .stage { padding: 10px; }
+  .slide-frame {
+    /* Auto margins rather than align-items: center. Both centre the frame in
+       the spare height, but a centred flex item in a scroll container has its
+       overflowing top cut off and unreachable — which is what happens the
+       moment the keyboard shortens the stage. */
+    margin-block: auto;
+    border-radius: 6px;
+    box-shadow: 0 4px 16px rgba(0, 0, 0, .4);
+  }
+  /* Desktop pads the editor 40/60px inside a 960px frame. As percentages of
+     the frame width those are the same insets at any size — and percentage
+     padding resolves against width on both axes, which is what keeps a
+     third-size frame from looking like it has margins for a poster. */
+  .slide-editor,
+  .slide-source { padding: 4.2% 6.25%; }
+  /* --stage-scale is the frame's width over the 960px it was designed at,
+     set by updateStageScale() in app.js. Without it the type keeps its
+     desktop size in a frame a third as wide, and a single heading fills the
+     slide.
+
+     Note this drops the .55 the desktop stage applies. That factor makes the
+     desktop editor deliberately denser than the deck so more text is visible
+     while writing; at a third the width it would land near 9px, which is
+     neither readable nor honest. Scaling the theme's real base size by the
+     frame instead puts a phone at roughly 16px — legible, and a true preview
+     of what will overflow. The floor covers the narrowest handsets. */
+  .slide-editor {
+    font-size: max(13px, calc(var(--r-main-font-size, 40px) * var(--stage-scale, 1)));
+  }
+  /* Raw HTML is chrome, not slide content, so it doesn't scale with the
+     frame — and 16px keeps iOS from zooming when it takes focus. */
+  .slide-source { font-size: 16px; }
+  /* 70vh is taller than the whole frame here. */
+  .slide-editor img { max-height: 100%; }
+
+  /* ---- Slide navigation strip ---- */
+  .mobile-slidebar {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    flex: 0 0 auto;
+    padding: 6px 8px;
+    padding-bottom: max(6px, env(safe-area-inset-bottom));
+    border-top: 1px solid var(--border);
+    background: var(--panel);
+  }
+  .mobile-slidebar button {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 7px;
+    min-width: 40px;
+    height: 40px;
+    padding: 0 10px;
+  }
+  .mobile-slidebar button .bi { font-size: 17px; }
+  .mobile-slidebar button:disabled { opacity: .35; }
+  .mobile-slidebar button:disabled:hover { background: var(--panel-2); }
+  .mobile-slidebar .m-picker {
+    flex: 1;
+    min-width: 0;
+    font-size: 13px;
+    white-space: nowrap;
+    overflow: hidden;
+  }
+
+  /* ---- Meta strip as a bottom sheet ---- */
+  .meta {
+    position: absolute;
+    z-index: 95;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    max-height: 100%;
+    overflow-y: auto;
+    flex-direction: column;
+    align-items: stretch;
+    flex-wrap: nowrap;
+    gap: 12px;
+    padding: 0 14px;
+    padding-bottom: max(16px, calc(env(safe-area-inset-bottom) + 16px));
+    border-radius: 14px 14px 0 0;
+    box-shadow: 0 -8px 34px rgba(0, 0, 0, .45);
+    transform: translateY(101%);
+    /* Parked below .layout rather than below the viewport, so it would show
+       through in the gap whenever the shell is shorter than the window — the
+       keyboard normally fills that gap, but nothing guarantees it. Hidden
+       until the transform has finished running it out of the way. */
+    visibility: hidden;
+    transition: transform .24s ease, visibility 0s linear .24s;
+  }
+  body.meta-open .meta {
+    transform: none;
+    visibility: visible;
+    transition: transform .24s ease, visibility 0s;
+  }
+  .meta-sheet-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    position: sticky;
+    top: 0;
+    z-index: 1;
+    margin: 0 -14px;
+    padding: 12px 14px 10px;
+    background: var(--panel);
+    border-bottom: 1px solid var(--border);
+  }
+  .meta .field { width: 100%; }
+  .meta select,
+  .meta input[type=text],
+  .meta textarea {
+    width: 100%;
+    min-width: 0;
+  }
+  .meta textarea { min-height: 88px; }
+  .meta .notes-head button { padding: 5px 10px; font-size: 13px; }
+
+  /* ---- Overlays that assumed a desktop-sized window ---- */
+  .notes-panel {
+    position: absolute;
+    inset: 0;
+    z-index: 96;
+    border-left: none;
+  }
+  .context-menu {
+    max-width: calc(100vw - 16px);
+    max-height: 70dvh;
+    overflow-y: auto;
+    font-size: 15px;
+  }
+  .context-menu button { padding: 10px 14px; }
+  .theme-card {
+    width: 100%;
+    border-left: none;
+  }
+  .settings-card,
+  .sync-card,
+  .about-card {
+    width: calc(100% - 16px);
+    max-height: calc(100% - 16px);
+  }
+  .settings-row {
+    grid-template-columns: 1fr;
+    align-items: start;
+    gap: 4px;
+  }
+  .settings-row input[type=checkbox] { justify-self: start; }
+  .settings-row input[type=number],
+  .settings-row select { width: 100%; }
+  .color-pair { width: 100%; }
+  .color-pair input[type=text] { width: 100%; min-width: 0; }
+  .projects-body { padding: 12px; }
+  /* Name, dates and four actions don't fit on one line; let the actions take
+     a row of their own under the name. */
+  .projects-list li { grid-template-columns: 1fr; }
+  .projects-list .proj-actions {
+    grid-column: 1;
+    grid-row: auto;
+    flex-wrap: wrap;
+  }
+  .projects-list .proj-actions button { padding: 7px 10px; }
+  /* Markdown mode already replaces the toolbar, stage and meta strip; the
+     slide strip navigates something that isn't on screen. */
+  body.markdown-mode .mobile-slidebar { display: none; }
+
+  .markdown-head { gap: 8px; padding: 8px 10px; }
+  .markdown-hint { display: none; }
+  .markdown-status { min-width: 0; }
+  #markdown-text { font-size: 16px; padding: 12px; }
+}
+
+/* A short landscape window (a phone on its side) is height-bound, not
+   width-bound: a frame sized off the width would be taller than the stage and
+   have to be scrolled. Size it off the height instead so the whole slide is
+   on screen. */
+@media (max-height: 500px) and (max-width: 950px) and (orientation: landscape) {
+  .slide-frame {
+    width: auto;
+    height: 100%;
+    max-width: 100%;
+  }
+}

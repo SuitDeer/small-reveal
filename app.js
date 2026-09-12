@@ -2,7 +2,7 @@
 (async () => {
   'use strict';
 
-  const APP_VERSION = '1.4.1'; // semver — single source of truth for the About modal
+  const APP_VERSION = '1.5.0'; // semver — single source of truth for the About modal
   const REVEAL_VERSION = '5.1.0';
   // The app was called "Reveal Editor" before it was Small Reveal. Every
   // storage key below still carries the old name ON PURPOSE — they address
@@ -132,6 +132,18 @@
     notesPanelText: $('#notes-panel-text'),
     notesPanelClose: $('#notes-panel-close'),
     notesPanelSlide: $('#notes-panel-slide'),
+    sidebar: $('.sidebar'),
+    metaStrip: $('.meta'),
+    mobileMenuBtn: $('#btn-mobile-menu'),
+    mobileScrim: $('#mobile-scrim'),
+    slidesClose: $('#btn-slides-close'),
+    mPrev: $('#m-prev'),
+    mNext: $('#m-next'),
+    mPicker: $('#m-picker'),
+    mPosition: $('#m-position'),
+    mAdd: $('#m-add'),
+    mOptions: $('#m-options'),
+    metaSheetClose: $('#meta-sheet-close'),
   };
 
   const FRAGMENT_TYPES = [
@@ -669,8 +681,27 @@
         deleteSlide(slide.id);
       });
 
+      // Same menu as right-click, reachable by tapping. Shown only on small
+      // screens, where dragging rows and right-clicking are both out.
+      const rowMenu = document.createElement('button');
+      rowMenu.type = 'button';
+      rowMenu.className = 'row-menu';
+      rowMenu.title = 'Slide actions';
+      rowMenu.setAttribute('aria-label', 'Slide actions');
+      rowMenu.setAttribute('aria-haspopup', 'menu');
+      const rowMenuIcon = document.createElement('i');
+      rowMenuIcon.className = 'bi bi-three-dots-vertical';
+      rowMenuIcon.setAttribute('aria-hidden', 'true');
+      rowMenu.appendChild(rowMenuIcon);
+      rowMenu.addEventListener('click', (e) => {
+        e.stopPropagation();
+        const r = rowMenu.getBoundingClientRect();
+        showSlideContextMenu(slide.id, r.left, r.bottom + 4);
+      });
+
       li.appendChild(num);
       li.appendChild(label);
+      li.appendChild(rowMenu);
       li.appendChild(del);
 
       li.addEventListener('click', () => selectSlide(slide.id));
@@ -737,6 +768,7 @@
 
       els.slideList.appendChild(li);
     });
+    updateMobileBar();
   }
 
   // -------- Slide context menu --------
@@ -815,6 +847,7 @@
     state.currentId = s.id;
     renderAll();
     scheduleSave();
+    closeSlidesDrawer();
     els.editor.focus();
   }
 
@@ -942,6 +975,7 @@
     applySlideEffects();
     applyEditorBackground();
     syncToolbarState();
+    updateMobileBar();
   }
 
   // Visualizes the current slide's background in the editor: color/image as
@@ -1190,10 +1224,28 @@
     }
   }
 
+  // The width .slide-frame is designed around; --stage-scale measures the
+  // frame against it.
+  const STAGE_REFERENCE_WIDTH = 960;
+
+  // Publishes how far the frame is from its full width, for the small-screen
+  // rules to size slide text by. Their font-size is a multiple of the deck's
+  // base size, which is only right while the frame is 960px wide; on a phone
+  // it is a third of that, and unscaled type turns one heading into a whole
+  // slide. Nothing outside the mobile block reads it, so the desktop stage
+  // renders exactly as before.
+  function updateStageScale() {
+    const w = els.frame.clientWidth;
+    if (!w) return;
+    const scale = Math.min(1, w / STAGE_REFERENCE_WIDTH);
+    els.frame.style.setProperty('--stage-scale', String(Math.round(scale * 1000) / 1000));
+  }
+
   // Reveal's r-fit-text scales an element's font-size to fill the slide width;
   // r-stretch fills the slide's remaining vertical space. The editor uses the
   // same conventions so the preview matches what the deck will render.
   function applySlideEffects() {
+    updateStageScale();
     if (sourceMode) return;
     els.editor.querySelectorAll('.r-fit-text').forEach(fitTextElement);
     els.editor.querySelectorAll('.r-stretch').forEach(stretchElement);
@@ -1242,6 +1294,7 @@
     state.currentId = id;
     renderAll();
     scheduleSave();
+    closeSlidesDrawer();
   }
 
   function addSlide({ atEnd = false } = {}) {
@@ -1744,7 +1797,11 @@
   // to fit one line on a laptop. Both reuse the slide context menu's styling.
   let toolbarMenuAnchor = null;
 
-  function openToolbarMenu(anchor, items) {
+  // restoreFocus: whether picking an item puts the caret back in the editor
+  // first. True for menus whose items act on the selection; false for the
+  // small-screen app menu, where refocusing the editor pops the on-screen
+  // keyboard over the panel the item just opened.
+  function openToolbarMenu(anchor, items, { restoreFocus = true } = {}) {
     const menu = els.toolbarMenu;
     menu.replaceChildren();
     items.forEach(item => {
@@ -1775,7 +1832,7 @@
         closeToolbarMenu(false);
         // Menu items live outside the editor, so put the caret back where it
         // was before running a command that acts on the selection.
-        restoreEditorSelection();
+        if (restoreFocus) restoreEditorSelection();
         item.action();
       });
       menu.appendChild(btn);
@@ -1822,7 +1879,24 @@
     if (toolbarMenuAnchor === els.moreBtn) { closeToolbarMenu(); return; }
     const el = selectionElement();
     const inPre = !!(el && el.closest('pre'));
+    const extras = [];
+    // The small-screen toolbar is one scrolling row, so the reveal.js sizing
+    // group folds in here rather than dropping off the end of it.
+    if (isMobile()) {
+      const inside = (selector) => {
+        const hit = el && el.closest(selector);
+        return !!(hit && els.editor.contains(hit));
+      };
+      extras.push(
+        { label: 'Fit text to slide', toggle: true, checked: inside('.r-fit-text'),
+          action: () => handleToolbarAction('fit-text') },
+        { label: 'Stretch to fill slide', toggle: true, checked: inside('.r-stretch'),
+          action: () => handleToolbarAction('stretch') },
+        { sep: true },
+      );
+    }
     openToolbarMenu(els.moreBtn, [
+      ...extras,
       { label: 'Underline', toggle: true, checked: cmdState('underline'),
         action: () => runCmd('underline') },
       { label: 'Strikethrough', toggle: true, checked: cmdState('strikeThrough'),
@@ -3789,6 +3863,189 @@ ${sections}
     else openNotesPanel();
   }
 
+  // -------- Small-screen shell --------
+  // On a phone the desktop shell leaves the slide as a letterbox between four
+  // bands of chrome. Here the slide takes the stage and the chrome collapses
+  // into three things you pull open: the slide list as a left drawer, the meta
+  // strip as a bottom sheet, and the rest of the topbar as one ⋯ menu. None of
+  // it is a second implementation — every control below drives the same
+  // element or function the desktop chrome does, so there is nothing to keep
+  // in step.
+  //
+  // Kept in sync with the media query at the foot of styles.css.
+  const MOBILE_QUERY = '(max-width: 760px), (max-height: 500px) and (max-width: 950px)';
+  const mobileMq = window.matchMedia(MOBILE_QUERY);
+  const isMobile = () => mobileMq.matches;
+
+  function isMobileLayerOpen() {
+    return document.body.classList.contains('slides-open')
+      || document.body.classList.contains('meta-open');
+  }
+
+  // One backdrop serves the drawer and the sheet; it is only ever up when one
+  // of them is, and each button reports its own panel's state.
+  function syncMobileChrome() {
+    els.mobileScrim.hidden = !isMobileLayerOpen();
+    els.mPicker.setAttribute('aria-expanded',
+      document.body.classList.contains('slides-open') ? 'true' : 'false');
+    els.mOptions.setAttribute('aria-expanded',
+      document.body.classList.contains('meta-open') ? 'true' : 'false');
+  }
+
+  // Focus moves into whichever panel opens and comes back when it closes —
+  // the contract the modals have. It keeps its own return slot rather than
+  // borrowing focusModal()'s, so a modal opened from inside the drawer can't
+  // consume the drawer's.
+  let mobileLayerReturnFocus = null;
+
+  function focusMobileLayer(panel) {
+    if (!isMobile()) return;
+    if (!mobileLayerReturnFocus) mobileLayerReturnFocus = document.activeElement;
+    // The active slide row, where Enter selects — landing on "Add slide"
+    // instead would put a destructive default under the return key.
+    const target = panel.querySelector('li.active')
+      || panel.querySelector('button, select, input, textarea');
+    if (target) target.focus();
+  }
+
+  function releaseMobileLayerFocus() {
+    const prev = mobileLayerReturnFocus;
+    mobileLayerReturnFocus = null;
+    if (prev && document.contains(prev)) prev.focus();
+  }
+
+  function openSlidesDrawer() {
+    closeMetaSheet();
+    document.body.classList.add('slides-open');
+    syncMobileChrome();
+    focusMobileLayer(els.sidebar);
+  }
+
+  function closeSlidesDrawer() {
+    if (!document.body.classList.contains('slides-open')) return;
+    document.body.classList.remove('slides-open');
+    syncMobileChrome();
+    releaseMobileLayerFocus();
+  }
+
+  function openMetaSheet() {
+    closeSlidesDrawer();
+    document.body.classList.add('meta-open');
+    syncMobileChrome();
+    focusMobileLayer(els.metaStrip);
+  }
+
+  function closeMetaSheet() {
+    if (!document.body.classList.contains('meta-open')) return;
+    document.body.classList.remove('meta-open');
+    syncMobileChrome();
+    releaseMobileLayerFocus();
+  }
+
+  function closeMobileLayers() {
+    closeSlidesDrawer();
+    closeMetaSheet();
+  }
+
+  // The on-screen keyboard doesn't shrink the layout viewport on iOS, so a
+  // full-height shell keeps its bottom strip and toolbar behind the keyboard
+  // and the browser scrolls the whole page to chase the caret. The visual
+  // viewport is the one measure that does shrink; publishing it as
+  // --viewport-height lets the shell give way to the keyboard and keeps the
+  // controls on screen. Pinch-zoom shrinks it too, which is not a keyboard
+  // and must not compress the layout — hence the scale guard.
+  function syncViewportHeight() {
+    const vv = window.visualViewport;
+    if (!vv) return;
+    const root = document.documentElement;
+    if (vv.scale > 1.01) root.style.removeProperty('--viewport-height');
+    else root.style.setProperty('--viewport-height', `${Math.round(vv.height)}px`);
+  }
+
+  // Prev/next walk the flat slide array, so vertical sub-slides are visited in
+  // the same order the deck plays them.
+  function stepSlide(delta) {
+    const idx = state.slides.findIndex(s => s.id === state.currentId);
+    if (idx < 0) return;
+    const next = idx + delta;
+    if (next < 0 || next >= state.slides.length) return;
+    selectSlide(state.slides[next].id);
+  }
+
+  // The strip under the stage stands in for the slide list's numbering and
+  // its active row, so it is refreshed wherever the sidebar is.
+  function updateMobileBar() {
+    const total = state.slides.length;
+    const idx = state.slides.findIndex(s => s.id === state.currentId);
+    els.mPosition.textContent = idx < 0
+      ? `${total} slide${total === 1 ? '' : 's'}`
+      : `Slide ${slideNumber(idx)} of ${total}`;
+    els.mPrev.disabled = idx <= 0;
+    els.mNext.disabled = idx < 0 || idx >= total - 1;
+  }
+
+  // "off", "ready", "Synced 2 min ago" — whatever the pill is already saying,
+  // since the pill itself is hidden at this size.
+  function syncSummary() {
+    const label = els.syncPill.querySelector('.sync-label');
+    return label ? label.textContent.replace(/^Sync:\s*/, '') : '';
+  }
+
+  // Everything the topbar drops on a small screen. Reuses the toolbar's
+  // popover so there is one menu implementation, not two.
+  function openAppMenu() {
+    if (toolbarMenuAnchor === els.mobileMenuBtn) { closeToolbarMenu(); return; }
+    closeMobileLayers();
+    const theme = els.themeSelect.value;
+    const items = [
+      { label: 'Preview from this slide', checked: false,
+        action: () => showPreview({ fromCurrent: true }) },
+      { sep: true },
+      { label: 'Slide options…', hint: 'background, notes', checked: false,
+        disabled: markdownMode, action: openMetaSheet },
+      { label: 'Deck theme…', hint: theme, checked: false, action: openDeckThemeMenu },
+    ];
+    if (theme === 'custom') {
+      items.push({ label: 'Edit custom theme…', checked: false, action: openThemeModal });
+    }
+    items.push(
+      { label: 'Reveal.js settings…', checked: false, action: openSettingsModal },
+      { sep: true },
+      // The toolbar's HTML toggle is hidden at this size, and its "More" menu
+      // is disabled while source view is on — so the way back out has to
+      // live here, on a button that is never disabled.
+      { label: 'Edit slide as HTML', toggle: true, checked: sourceMode,
+        disabled: markdownMode, action: () => els.toggleSource.click() },
+      { label: 'Deck markdown', toggle: true, checked: markdownMode,
+        action: () => els.markdownBtn.click() },
+      { sep: true },
+      { label: 'Projects…', checked: false, action: openProjectsModal },
+      { label: 'New deck', checked: false, action: () => createProject() },
+      { label: 'Sync…', hint: syncSummary(), checked: false, action: openSyncModal },
+      { sep: true },
+      { label: document.body.classList.contains('light') ? 'Dark editor' : 'Light editor',
+        checked: false, action: toggleUiTheme },
+      { label: 'About Small Reveal', checked: false, action: () => els.aboutButton.click() },
+    );
+    openToolbarMenu(els.mobileMenuBtn, items, { restoreFocus: false });
+  }
+
+  // The deck-theme <select> is hidden on a phone, where a native picker of
+  // eleven one-word options is also the wrong shape. Drive the real control so
+  // its change handler (custom-theme drawer included) still runs.
+  function openDeckThemeMenu() {
+    const sel = els.themeSelect;
+    openToolbarMenu(els.mobileMenuBtn, Array.from(sel.options).map(opt => ({
+      label: opt.textContent,
+      checked: opt.value === sel.value,
+      action: () => {
+        if (opt.value === sel.value && opt.value !== 'custom') return;
+        sel.value = opt.value;
+        sel.dispatchEvent(new Event('change', { bubbles: true }));
+      },
+    })), { restoreFocus: false });
+  }
+
   // -------- Sync via GitHub Gist --------
   // Pre-rename names, kept so a browser that is already connected to a gist
   // stays connected. Renaming these would silently sign people out. See
@@ -4582,6 +4839,34 @@ ${sections}
     });
     els.notesPanelText.addEventListener('blur', endTextEditSession);
 
+    // Small-screen chrome. Each of these drives a control the desktop layout
+    // already owns, so none of them carries editor logic of its own.
+    els.mobileMenuBtn.addEventListener('click', openAppMenu);
+    els.slidesClose.addEventListener('click', closeSlidesDrawer);
+    els.mobileScrim.addEventListener('click', closeMobileLayers);
+    els.mPicker.addEventListener('click', openSlidesDrawer);
+    els.mPrev.addEventListener('click', () => stepSlide(-1));
+    els.mNext.addEventListener('click', () => stepSlide(1));
+    els.mAdd.addEventListener('click', () => addSlide());
+    els.mOptions.addEventListener('click', () => {
+      if (document.body.classList.contains('meta-open')) closeMetaSheet();
+      else openMetaSheet();
+    });
+    els.metaSheetClose.addEventListener('click', closeMetaSheet);
+    // Rotating a phone, or dragging a desktop window across the breakpoint,
+    // otherwise leaves a drawer open with nowhere for it to sit.
+    mobileMq.addEventListener('change', (e) => {
+      if (!e.matches) closeMobileLayers();
+      updateStageScale();
+    });
+    if (window.visualViewport) {
+      syncViewportHeight();
+      window.visualViewport.addEventListener('resize', () => {
+        syncViewportHeight();
+        updateStageScale();
+      });
+    }
+
     // About modal
     if (els.aboutVersion) els.aboutVersion.textContent = APP_VERSION;
     const closeAboutModal = () => { els.aboutModal.hidden = true; restoreModalFocus(); };
@@ -4684,6 +4969,7 @@ ${sections}
         else if (!els.syncModal.hidden) closeSyncModal();
         else if (!els.aboutModal.hidden) { els.aboutModal.hidden = true; restoreModalFocus(); }
         else if (isNotesPanelOpen()) closeNotesPanel();
+        else if (isMobileLayerOpen()) closeMobileLayers();
       }
     });
 

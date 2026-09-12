@@ -7,7 +7,7 @@
      this meta tag is what enforces it on static hosts like GitHub Pages. -->
 <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' https://cdn.jsdelivr.net https://gc.zgo.at; style-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net https://fonts.googleapis.com; img-src 'self' data: https:; media-src 'self' data: https:; font-src 'self' data: https://cdn.jsdelivr.net https://fonts.gstatic.com; frame-src 'self' https:; connect-src 'self' https://cdn.jsdelivr.net https://api.github.com https://gist.githubusercontent.com https://slides.goatcounter.com; base-uri 'self'; form-action 'self'; object-src 'none'">
 <meta name="referrer" content="no-referrer">
-<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <title>Small Reveal</title>
 <meta name="description" content="A lightweight, browser-based WYSIWYG editor for building reveal.js presentations. Decks live in your browser—nothing is uploaded. Made by Mark Sample.">
 
@@ -77,6 +77,9 @@
     <button id="btn-sync" type="button" class="sync-pill" title="Sync to GitHub Gist"><i class="bi bi-cloud-slash sync-icon" aria-hidden="true"></i><span class="sync-label">Sync: off</span></button>
     <button id="btn-settings" type="button" title="reveal.js settings for this deck" aria-label="Settings"><i class="bi bi-sliders"></i></button>
     <button id="btn-theme-toggle" type="button" title="Switch the editor between light and dark (does not affect the deck)" aria-label="Toggle editor light/dark mode"><i class="bi bi-moon"></i></button>
+    <!-- Small screens hide almost all of the topbar; this gathers it into one
+         menu. Display is flipped on in the mobile block of styles.css. -->
+    <button id="btn-mobile-menu" type="button" title="More" aria-label="More" aria-haspopup="menu" aria-expanded="false"><i class="bi bi-three-dots-vertical" aria-hidden="true"></i></button>
   </div>
 </header>
 
@@ -85,6 +88,7 @@
     <div class="sidebar-head">
       <span>Slides</span>
       <button id="btn-add-slide" type="button" class="add-slide" title="Add a slide to the end of the deck (Ctrl/Cmd+Shift+Enter)" aria-label="Add slide"><i class="bi bi-plus-lg" aria-hidden="true"></i></button>
+      <button id="btn-slides-close" type="button" class="sidebar-close" aria-label="Close slide list"><i class="bi bi-x-lg" aria-hidden="true"></i></button>
     </div>
     <ol id="slide-list" class="slide-list"></ol>
     <div class="sidebar-foot">
@@ -146,7 +150,22 @@
       </div>
     </div>
 
+    <!-- Small screens only. Moving between slides, adding one, and reaching
+         the slide's own settings are the three things the hidden sidebar and
+         meta strip were carrying; this strip carries them instead. -->
+    <div class="mobile-slidebar" id="mobile-slidebar">
+      <button type="button" id="m-prev" title="Previous slide" aria-label="Previous slide"><i class="bi bi-chevron-left" aria-hidden="true"></i></button>
+      <button type="button" id="m-picker" class="m-picker" title="Show all slides" aria-label="Show all slides" aria-expanded="false"><i class="bi bi-list-ul" aria-hidden="true"></i><span id="m-position">Slide 1</span></button>
+      <button type="button" id="m-next" title="Next slide" aria-label="Next slide"><i class="bi bi-chevron-right" aria-hidden="true"></i></button>
+      <button type="button" id="m-add" title="Add slide" aria-label="Add slide"><i class="bi bi-plus-lg" aria-hidden="true"></i></button>
+      <button type="button" id="m-options" title="Slide options" aria-label="Slide options" aria-expanded="false"><i class="bi bi-sliders2" aria-hidden="true"></i></button>
+    </div>
+
     <div class="meta">
+      <div class="meta-sheet-head">
+        <strong>Slide options</strong>
+        <button type="button" id="meta-sheet-close" aria-label="Close slide options">Done</button>
+      </div>
       <label class="field">
         Transition
         <select id="slide-transition">
@@ -218,6 +237,8 @@
     </div>
     <textarea id="notes-panel-text" placeholder="Notes shown in the speaker view (press S during a presentation)"></textarea>
   </aside>
+
+  <div id="mobile-scrim" class="mobile-scrim" hidden></div>
 </main>
 
 <div id="preview-modal" class="modal" hidden>
