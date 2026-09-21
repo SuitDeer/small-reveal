@@ -85,6 +85,7 @@
     notes: $('#slide-notes'),
     status: $('#status'),
     fileInput: $('#file-input'),
+    videoFileInput: $('#video-file-input'),
     projectsButton: $('#btn-projects'),
     projectsModal: $('#projects-modal'),
     projectsClose: $('#projects-close'),
@@ -1480,6 +1481,10 @@
         delete els.fileInput.dataset.linkHref;
         els.fileInput.click();
         break;
+      case 'video':
+        delete els.fileInput.dataset.linkHref;
+        els.videoFileInput.click();
+        break;
       case 'linked-image': {
         const url = prompt(
           'Open this URL in a new window when the image is clicked:',
@@ -2256,6 +2261,25 @@
     }
   }
 
+  async function insertVideoFromFile(file) {
+    if (!file || !file.type.startsWith('video/')) return;
+    const dataUrl = await fileToDataUrl(file);
+    const tag = `<video src="${escapeAttr(dataUrl)}" controls controlsList="nofullscreen nodownload noremoteplayback noplaybackrate" disablePictureInPicture autoplay muted></video><br>`;
+    recordHistory();
+    if (sourceMode) {
+      const ta = els.source;
+      const pos = ta.selectionStart;
+      const before = ta.value.slice(0, pos);
+      const after = ta.value.slice(ta.selectionEnd);
+      ta.value = before + tag + after;
+      ta.selectionStart = ta.selectionEnd = pos + tag.length;
+      onEditorInput();
+    } else {
+      insertHTMLAtCursor(tag);
+    }
+    setStatus(`Video: ${formatBytes(file.size)}`, true);
+  }
+
   let dragDepth = 0;
   function setupDropZone() {
     const target = els.frame;
@@ -2283,7 +2307,10 @@
       dragDepth = 0;
       els.dropOverlay.hidden = true;
       const files = Array.from(e.dataTransfer.files || []);
-      files.filter(f => f.type.startsWith('image/')).forEach(insertImageFromFile);
+      files.forEach(f => {
+        if (f.type.startsWith('image/')) insertImageFromFile(f);
+        else if (f.type.startsWith('video/')) insertVideoFromFile(f);
+      });
     });
   }
 
@@ -2295,6 +2322,11 @@
         if (item.kind === 'file' && item.type.startsWith('image/')) {
           e.preventDefault();
           insertImageFromFile(item.getAsFile());
+          return;
+        }
+        if (item.kind === 'file' && item.type.startsWith('video/')) {
+          e.preventDefault();
+          insertVideoFromFile(item.getAsFile());
           return;
         }
       }
@@ -4810,6 +4842,12 @@ ${sections}
       delete els.fileInput.dataset.linkHref;
       if (file) insertImageFromFile(file, linkHref);
       els.fileInput.value = '';
+    });
+
+    els.videoFileInput.addEventListener('change', () => {
+      const file = els.videoFileInput.files && els.videoFileInput.files[0];
+      if (file) insertVideoFromFile(file);
+      els.videoFileInput.value = '';
     });
 
     $('#btn-preview').addEventListener('click', () => showPreview());

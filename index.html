@@ -123,6 +123,7 @@
       <div class="tb-group" role="group" aria-label="Insert">
         <button type="button" data-action="link" title="Link the selected text to a URL" aria-label="Link"><i class="bi bi-link-45deg"></i></button>
         <button type="button" data-action="image" title="Insert an image from your computer" aria-label="Insert image"><i class="bi bi-image"></i></button>
+        <button type="button" data-action="video" title="Insert a video from your computer" aria-label="Insert video"><i class="bi bi-film"></i></button>
       </div>
       <div class="tb-group" role="group" aria-label="Reveal.js sizing">
         <button type="button" data-action="fit-text" title="Scale this block to fill the slide width (reveal.js r-fit-text)" aria-label="Fit text to slide" aria-pressed="false"><i class="bi bi-fonts"></i><span class="tb-label">Fit text</span></button>
@@ -146,7 +147,7 @@
         <div id="slide-editor" class="slide-editor" contenteditable="true" spellcheck="true"></div>
         <textarea id="slide-source" class="slide-source" spellcheck="false" hidden></textarea>
         <div id="slide-bg-badge" class="slide-bg-badge" hidden></div>
-        <div id="drop-overlay" class="drop-overlay" hidden>Drop image to embed</div>
+        <div id="drop-overlay" class="drop-overlay" hidden>Drop image or video to embed</div>
       </div>
     </div>
 
@@ -458,6 +459,7 @@
 <div id="toolbar-menu" class="context-menu" role="menu" hidden></div>
 
 <input id="file-input" type="file" accept="image/*" hidden>
+<input id="video-file-input" type="file" accept="video/*" hidden>
 
 <script src="https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js"
         integrity="sha384-+mbV2IY1Zk/X1p/nWllGySJSUN8uMs+gUAN10Or95UBH0fpj6GfKgPmgC5EXieXG"

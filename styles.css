@@ -561,7 +561,8 @@ body.light .context-menu button.danger { color: #b91c1c; }
 .slide-editor code, .slide-editor pre code {
   font-family: var(--r-code-font, ui-monospace, Menlo, Consolas, monospace);
 }
-.slide-editor img { max-width: 100%; max-height: 70vh; }
+.slide-editor img,
+.slide-editor video { max-width: 100%; max-height: 70vh; }
 
 /* Editor-only marker for click-to-open linked images. Doesn't follow into the
    exported deck or preview — there the link itself is the affordance. */
@@ -1399,7 +1400,8 @@ body.light .sync-error { color: #b91c1c; }
      frame — and 16px keeps iOS from zooming when it takes focus. */
   .slide-source { font-size: 16px; }
   /* 70vh is taller than the whole frame here. */
-  .slide-editor img { max-height: 100%; }
+  .slide-editor img,
+  .slide-editor video { max-height: 100%; }
 
   /* ---- Slide navigation strip ---- */
   .mobile-slidebar {
